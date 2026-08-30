@@ -206,3 +206,33 @@ def cluster_paragraphs(lines: list[Line], page_width: float, page_height: float)
 
     # 全宽元素（标题）在阅读顺序头部；分类由 Task 9 的 classify_paragraph 负责
     return paragraphs
+
+
+_MONO_FONT = re.compile(r"(?i)mono|courier|consolas|menlo|source|code|typewriter")
+
+
+def _is_monospace(para: Paragraph) -> bool:
+    for line in para.lines:
+        for span in line.spans:
+            if _MONO_FONT.search(span.font):
+                return True
+    return False
+
+
+def _body_size(para: Paragraph) -> float:
+    return max(s.size for l in para.lines for s in l.spans)
+
+
+def classify_paragraph(para: Paragraph, body_size: float | None = None) -> None:
+    """就地标注段落类型。body_size 传页内正文字号基准以判标题；缺省时用段落自身字号。"""
+    if _is_monospace(para):
+        para.type = "code"
+        return
+    first = para.lines[0].text.strip()
+    if _LIST_START.match(first):  # _LIST_START 定义于 Task 8（聚类列表项规则复用）
+        para.type = "list-item"
+        return
+    if body_size is not None and _body_size(para) >= body_size * 1.4:
+        para.type = "heading"
+        return
+    para.type = "body"
