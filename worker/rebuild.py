@@ -39,8 +39,9 @@ def _cover_and_write(page: fitz.Page, para: dict[str, Any], text: str) -> list[d
 
     page.add_redact_annot(rect, fill=(1, 1, 1))
     # 注：pymupdf 1.28.2 的 apply_redactions 签名是 (images, graphics, text)，
-    # 已无 annots 参数（旧版 PDF_REDACT_ANNOTS_* 常量随之移除）；此版本 redaction
-    # 只应用 redaction 注释本身，不会删除其他注释——"保留注释" 是默认行为。
+    # 已无 annots 参数（旧版 PDF_REDACT_ANNOTS_* 常量随之移除）。此版本行为：
+    # 非链接注释保留；**与 redaction 区域相交的链接注释（URI link）会被删除**——
+    # Task 21 需做链接捕获-恢复，不能依赖默认保留。
     page.apply_redactions(
         images=fitz.PDF_REDACT_IMAGE_NONE,
         graphics=fitz.PDF_REDACT_LINE_ART_NONE,
@@ -50,6 +51,7 @@ def _cover_and_write(page: fitz.Page, para: dict[str, Any], text: str) -> list[d
     write_rect = fitz.Rect(rect.x0, anchor_y - fontsize, rect.x1, rect.y1 + 50)
     # 译文可能比原文宽（如 "translated line" 74.7pt vs 原 bbox 65.4pt）；按译文自然宽度
     # 扩右边，避免 insert_textbox 折行（否则提取文本带 \n，且断言 'translated line' 失败）。
+    # 注意：宽度度量用 helv——CJK 译文宽度 ≈ 0，需 Task 19 的 FontResolver 一并驱动测量。
     text_width = fitz.get_text_length(text, fontname="helv", fontsize=fontsize)
     if rect.x0 + text_width > write_rect.x1:
         write_rect.x1 = rect.x0 + text_width + 1.0
