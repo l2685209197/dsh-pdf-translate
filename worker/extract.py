@@ -6,7 +6,7 @@ from typing import Any
 
 import pymupdf as fitz  # 1.28.2 的 fitz shim 会在 stdout 打印弃用警告，污染 stdio 协议
 
-from worker.model import Line, Span
+from worker.model import Line, Paragraph, Span
 
 
 def text_layer_info(payload: dict[str, Any]) -> dict[str, Any]:
@@ -127,3 +127,78 @@ def _overlaps_x(a: Line, b: Line) -> bool:
     a0, _, a1, _ = a.bbox
     b0, _, b1, _ = b.bbox
     return min(a1, b1) - max(a0, b0) > 1.0
+
+
+def _line_pitch(lines: list[Line]) -> float:
+    """典型行距中位数：同一 y 列内相邻行的 y 起点差。"""
+    ys = sorted(l.bbox[1] for l in lines)
+    gaps = [b - a for a, b in zip(ys, ys[1:]) if b - a > 0.5]
+    if not gaps:
+        return 14.0
+    gaps.sort()
+    return gaps[len(gaps) // 2]
+
+
+def _same_style(a: Line, b: Line) -> bool:
+    if not a.spans or not b.spans:
+        return True  # 无 span 信息的 Line（测试夹具）视为同样式
+    sa, sb = a.spans[0], b.spans[0]
+    return abs(sa.size - sb.size) < 1.0 and sa.font == sb.font
+
+
+def _paragraph_segments(assignment: ColumnAssignment) -> list[list[Line]]:
+    """聚类分段：全宽段（按 y）+ 各列（每列一段），段边界是无条件分段点。"""
+    segments: list[list[Line]] = []
+    if assignment.full_width:
+        segments.append(sorted(assignment.full_width, key=lambda l: l.bbox[1]))
+    segments.extend(assignment.columns)
+    return segments
+
+
+def cluster_paragraphs(lines: list[Line], page_width: float, page_height: float) -> list[Paragraph]:
+    """列检测 + 行合并 → 段落列表（阅读顺序）。"""
+    assignment = assign_columns(lines, page_width)
+    pitch = _line_pitch(assignment.ordered) or 14.0
+    paragraphs: list[Paragraph] = []
+    current: list[Line] = []
+
+    def flush() -> None:
+        if not current:
+            return
+        first = current[0]
+        last = current[-1]
+        bbox = (
+            min(l.bbox[0] for l in current),
+            min(l.bbox[1] for l in current),
+            max(l.bbox[2] for l in current),
+            max(l.bbox[3] for l in current),
+        )
+        paragraphs.append(
+            Paragraph(
+                id=len(paragraphs),
+                bbox=bbox,
+                first_line_anchor=(first.origin[0], first.origin[1]),
+                lines=list(current),
+                reading_order=len(paragraphs),
+            )
+        )
+        current.clear()
+
+    for segment in _paragraph_segments(assignment):
+        for line in segment:
+            if not current:
+                current.append(line)
+                continue
+            prev = current[-1]
+            gap = line.bbox[1] - prev.bbox[3]
+            # 断开条件：间隙过大 / 首行缩进 / 样式跳变
+            indent = line.bbox[0] - prev.bbox[0] > 12.0
+            if gap > pitch * 0.6 or indent or not _same_style(prev, line):
+                flush()
+            current.append(line)
+        flush()  # 段边界（全宽段/列边界）无条件分段——列缝处 y 间隙可能为负，
+        # 仅靠 gap 阈值会跨列合并，必须显式分段
+    flush()
+
+    # 全宽元素（标题）在阅读顺序头部；分类由 Task 9 的 classify_paragraph 负责
+    return paragraphs
