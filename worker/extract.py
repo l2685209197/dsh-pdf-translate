@@ -253,7 +253,12 @@ def _overlap_ratio(a: tuple[float, float, float, float], b: tuple[float, float, 
 
 
 def page_confidence(paragraphs: list[Paragraph]) -> float:
-    """置信度 = 1 - 重叠惩罚 - 单行段落惩罚。阈值 0.6 以下触发降级。"""
+    """置信度 = 1 - 重叠惩罚。阈值 0.6 以下触发降级。
+
+    只基于重叠：单行段落惩罚会误伤混合页面（标题+列表+正文段等合法单行内容，
+    使正确聚类的多行段落被降级拆散）；全单行页面的降级是恒等变换（无意义），
+    因此单行占比不构成低置信度信号。
+    """
     overlap_penalty = 0.0
     boxes = [p.bbox for p in paragraphs]
     pairs = 0
@@ -265,9 +270,7 @@ def page_confidence(paragraphs: list[Paragraph]) -> float:
                 pairs += 1
     if pairs:
         overlap_penalty = min(0.5, overlap_penalty / pairs)
-    singleton = sum(1 for p in paragraphs if len(p.lines) == 1 and p.type != "code")
-    singleton_penalty = 0.5 * (singleton / max(1, len(paragraphs)))
-    return max(0.0, 1.0 - overlap_penalty - singleton_penalty)
+    return max(0.0, 1.0 - overlap_penalty)
 
 
 def apply_fallback(paragraphs: list[Paragraph]) -> list[Paragraph]:

@@ -37,3 +37,21 @@ def test_apply_fallback_preserves_order():
     paras = extract.cluster_paragraphs(lines, page_width=600, page_height=800)
     degraded = extract.apply_fallback(paras)
     assert [p.lines[0].text for p in degraded] == ["a", "b"]
+
+
+def test_mixed_page_singletons_do_not_trigger_fallback():
+    # 回归：混合页面（合法单行内容占多数 + 一个正确聚类的多行段落）不得因
+    # 单行占比触发降级——旧公式（0.5×单行占比）会误伤正确聚类的多行段落
+    lines = [
+        _line(72, 100, 300, 112, "s1"),
+        _line(72, 140, 300, 152, "s2"),
+        _line(72, 180, 300, 192, "s3"),
+        _line(72, 220, 300, 232, "s4"),
+        _line(72, 260, 300, 272, "s5"),
+        _line(72, 300, 300, 312, "p1"),
+        _line(72, 312, 300, 324, "p2"),
+    ]
+    paras = extract.cluster_paragraphs(lines, page_width=600, page_height=800)
+    assert len(paras) == 6  # 5 单行 + 1 两行
+    assert any(len(p.lines) == 2 for p in paras)  # 正确聚类的多行段落存在
+    assert extract.page_confidence(paras) >= 0.6  # 旧公式（含单行惩罚）会 < 0.6
