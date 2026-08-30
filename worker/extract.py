@@ -241,3 +241,49 @@ def classify_paragraph(para: Paragraph, body_size: float | None = None) -> None:
         para.type = "heading"
         return
     para.type = "body"
+
+
+def _overlap_ratio(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> float:
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    area_a = max(1.0, (a[2] - a[0]) * (a[3] - a[1]))
+    area_b = max(1.0, (b[2] - b[0]) * (b[3] - b[1]))
+    return inter / min(area_a, area_b)
+
+
+def page_confidence(paragraphs: list[Paragraph]) -> float:
+    """置信度 = 1 - 重叠惩罚 - 单行段落惩罚。阈值 0.6 以下触发降级。"""
+    overlap_penalty = 0.0
+    boxes = [p.bbox for p in paragraphs]
+    pairs = 0
+    for i in range(len(boxes)):
+        for j in range(i + 1, len(boxes)):
+            r = _overlap_ratio(boxes[i], boxes[j])
+            if r > 0.3:
+                overlap_penalty += r
+                pairs += 1
+    if pairs:
+        overlap_penalty = min(0.5, overlap_penalty / pairs)
+    singleton = sum(1 for p in paragraphs if len(p.lines) == 1 and p.type != "code")
+    singleton_penalty = 0.5 * (singleton / max(1, len(paragraphs)))
+    return max(0.0, 1.0 - overlap_penalty - singleton_penalty)
+
+
+def apply_fallback(paragraphs: list[Paragraph]) -> list[Paragraph]:
+    """保守降级：每个 line 独立成段。宁可多拆不合并（错并会毁版面，多拆只多 API 调用）。"""
+    result: list[Paragraph] = []
+    for para in paragraphs:
+        for line in para.lines:
+            result.append(
+                Paragraph(
+                    id=len(result),
+                    bbox=line.bbox,
+                    first_line_anchor=line.origin,
+                    lines=[line],
+                    type=para.type,
+                    reading_order=len(result),
+                    confidence=0.5,
+                )
+            )
+    return result
