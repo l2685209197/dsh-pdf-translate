@@ -1,6 +1,7 @@
 """文本层检测与段落提取。"""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 import pymupdf as fitz  # 1.28.2 的 fitz shim 会在 stdout 打印弃用警告，污染 stdio 协议
@@ -81,3 +82,42 @@ def _lines_from_dict(page_dict: dict[str, Any]) -> list[Line]:
 
 def _extract_lines_from_pdf(doc: fitz.Document, page_index: int) -> list[Line]:
     return _lines_from_dict(doc[page_index].get_text("dict"))
+
+
+@dataclass
+class ColumnAssignment:
+    ordered: list[Line]  # 阅读顺序
+    full_width: list[Line]  # 跨栏元素（标题等），单独处理
+
+
+def _is_full_width(line: Line, page_width: float) -> bool:
+    return (line.bbox[2] - line.bbox[0]) >= page_width * 0.8
+
+
+def assign_columns(lines: list[Line], page_width: float) -> ColumnAssignment:
+    """x 轴投影聚类成列；输出阅读顺序（每列内自上而下，列按 x 从左到右）。"""
+    full_width = [l for l in lines if _is_full_width(l, page_width)]
+    body = [l for l in lines if not _is_full_width(l, page_width)]
+
+    columns: list[list[Line]] = []
+    for line in sorted(body, key=lambda l: (l.bbox[1], l.bbox[0])):
+        placed = False
+        for col in columns:
+            # 与列内任一行的 x 范围重叠即归入该列
+            if _overlaps_x(line, col[-1]):
+                col.append(line)
+                placed = True
+                break
+        if not placed:
+            columns.append([line])
+
+    columns.sort(key=lambda col: min(l.bbox[0] for l in col))
+    ordered = [l for col in columns for l in sorted(col, key=lambda l: l.bbox[1])]
+    ordered = full_width + ordered
+    return ColumnAssignment(ordered=ordered, full_width=full_width)
+
+
+def _overlaps_x(a: Line, b: Line) -> bool:
+    a0, _, a1, _ = a.bbox
+    b0, _, b1, _ = b.bbox
+    return min(a1, b1) - max(a0, b0) > 1.0
