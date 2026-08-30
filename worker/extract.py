@@ -50,12 +50,13 @@ def _body_size_of_page(doc: fitz.Document, page_index: int) -> float:
     for s in sizes:
         key = round(s, 1)
         counter[key] = counter.get(key, 0) + 1
-    return max(counter, key=counter.get)
+    # 众数；平局时取较小字号（正文更可能是小字号）
+    return min(counter, key=lambda k: (-counter[k], k))
 
 
 def extract_pages(payload: dict[str, Any]) -> dict[str, Any]:
     path = payload["path"]
-    start = int(payload.get("start", 0))
+    start = max(0, int(payload.get("start", 0)))  # 负索引在 PyMuPDF 中回绕，必须钳制
     end = int(payload.get("end", 0))
     doc = fitz.open(path)
     try:
