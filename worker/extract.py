@@ -26,8 +26,47 @@ def text_layer_info(payload: dict[str, Any]) -> dict[str, Any]:
         doc.close()
 
 
+def _paragraphs_of_page(doc: fitz.Document, page_index: int, body_size: float | None) -> list[Paragraph]:
+    lines = _extract_lines_from_pdf(doc, page_index)
+    if not lines:
+        return []
+    page = doc[page_index]
+    paras = cluster_paragraphs(lines, page.rect.width, page.rect.height)
+    for p in paras:
+        classify_paragraph(p, body_size)
+    if page_confidence(paras) < 0.6:
+        paras = apply_fallback(paras)
+    return paras
+
+
+def _body_size_of_page(doc: fitz.Document, page_index: int) -> float:
+    """页内正文字号基准：span 字号众数（最常见字号）。max() 会被页内标题等
+    大字号抬高、使标题判定失效（标题 18pt + 正文 12pt 时 max=18 → 阈值 25.2，
+    18pt 标题判为 body）；众数对均匀正文稳健。"""
+    sizes = [s.size for l in _extract_lines_from_pdf(doc, page_index) for s in l.spans]
+    if not sizes:
+        return 12.0
+    counter: dict[float, int] = {}
+    for s in sizes:
+        key = round(s, 1)
+        counter[key] = counter.get(key, 0) + 1
+    return max(counter, key=counter.get)
+
+
 def extract_pages(payload: dict[str, Any]) -> dict[str, Any]:
-    raise NotImplementedError("Task 6-11")
+    path = payload["path"]
+    start = int(payload.get("start", 0))
+    end = int(payload.get("end", 0))
+    doc = fitz.open(path)
+    try:
+        pages = []
+        for i in range(start, min(end, doc.page_count - 1) + 1):
+            body = _body_size_of_page(doc, i)
+            paras = _paragraphs_of_page(doc, i, body_size=body)
+            pages.append({"index": i, "paragraphs": [p.to_dict() for p in paras]})
+        return {"pages": pages}
+    finally:
+        doc.close()
 
 
 def _span_flags(flags: int) -> dict[str, bool]:

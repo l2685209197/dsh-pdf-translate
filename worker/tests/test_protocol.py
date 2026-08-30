@@ -38,10 +38,11 @@ def test_unknown_command_returns_error():
 
 
 def test_handler_exception_is_wrapped():
+    # Task 11 前 extract_pages 是 NotImplementedError 占位；实现后空 payload 缺 path → KeyError
     resp = run_cmd("extract", {})
     assert resp["id"] == 1
     assert resp["ok"] is False
-    assert "NotImplementedError" in resp["error"]
+    assert "KeyError" in resp["error"]
 
 
 def test_malformed_line_returns_protocol_error():
