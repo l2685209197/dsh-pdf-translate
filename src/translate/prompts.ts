@@ -1,4 +1,3 @@
-import type { Paragraph } from '../types.js'
 import type { TranslationBatch } from './chunker.js'
 
 export interface TermEntry {
@@ -14,7 +13,12 @@ export interface PromptOptions {
 
 export function buildSystemPrompt(opts: PromptOptions): string {
   const terms = opts.termbase
-    .map(t => (t.locked ? `- ${t.src}（保留原文，不翻译）` : `- ${t.src} → ${t.dst}`))
+    .map(t => {
+      // 术语表内容换行会破坏编号规则列表/伪造规则，渲染前压平
+      const src = t.src.replace(/[\r\n]+/g, ' ')
+      const dst = t.dst.replace(/[\r\n]+/g, ' ')
+      return t.locked ? `- ${src}（保留原文，不翻译）` : `- ${src} → ${dst}`
+    })
     .join('\n')
   return [
     `你是专业文档翻译引擎。语言对：${opts.langPair}。`,
@@ -24,7 +28,7 @@ export function buildSystemPrompt(opts: PromptOptions): string {
     '3. 代码、变量名、URL、数字保持不变。',
     '4. 术语表（优先遵守）：',
     terms || '（无）',
-    '5. 仅返回 JSON 对象，键为段落 id（数字），值为译文。',
+    '5. 仅返回 JSON 对象，键为段落 id（字符串，如 "3"），值为译文。',
   ].join('\n')
 }
 
@@ -41,12 +45,20 @@ export function parseBatchResponse(content: string, expectedIds: number[]): Map<
     .trim()
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/```\s*$/, '')
-  const parsed = JSON.parse(cleaned) as Record<string, unknown>
+  const parsed = JSON.parse(cleaned) as unknown
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('translation response is not a JSON object')
+  }
+  const obj = parsed as Record<string, unknown>
   const result = new Map<number, string>()
   for (const id of expectedIds) {
-    const value = parsed[String(id)]
-    if (typeof value !== 'string') {
+    const key = String(id)
+    if (!(key in obj)) {
       throw new Error(`translation response missing id ${id}`)
+    }
+    const value = obj[key]
+    if (typeof value !== 'string') {
+      throw new Error(`translation response invalid value for id ${id}`)
     }
     result.set(id, value)
   }

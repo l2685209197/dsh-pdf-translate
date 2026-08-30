@@ -37,4 +37,12 @@ describe('prompts', () => {
     const parsed = parseBatchResponse('```json\n{"3":"x"}\n```', [3])
     expect(parsed.get(3)).toBe('x')
   })
+
+  it('null 响应体报非对象错误', () => {
+    expect(() => parseBatchResponse('null', [3])).toThrow(/not a JSON object/)
+  })
+
+  it('非字符串值报 invalid', () => {
+    expect(() => parseBatchResponse(JSON.stringify({ 3: 42 }), [3])).toThrow(/invalid value/)
+  })
 })
