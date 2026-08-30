@@ -6,10 +6,21 @@
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
   "exports": {
-    ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" },
-    "./client": { "types": "./lib/types/client/index.d.ts", "default": "./lib/client.js" }
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    }
   },
-  "files": ["lib", "worker", "cordis.patch.yml", "README.md"],
+  "files": [
+    "lib",
+    "worker",
+    "cordis.patch.yml",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/build-client.mjs",
     "build:host": "tsc -p tsconfig.json",
@@ -27,6 +38,7 @@
     "@deepseek-ai/cordis": "4.0.1",
     "@deepseek-ai/dsh-settings": "0.1.1-rc.2",
     "@deepseek-ai/dsh-tools": "0.1.1-rc.2",
+    "@types/node": "^24.13.3",
     "@types/react": "^18.3.0",
     "esbuild": "^0.24.0",
     "react": "^18.3.1",
@@ -36,7 +48,9 @@
   "dsh": {
     "client": {
       "platform": "web",
-      "inject": ["@deepseek-ai/dsh-client-ui-settings-plugins"]
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings-plugins"
+      ]
     }
   }
 }
