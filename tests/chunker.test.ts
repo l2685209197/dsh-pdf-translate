@@ -37,6 +37,7 @@ describe('chunkParagraphs', () => {
     const code = para(0, 'code text', 'code')
     const batches = chunkParagraphs([code], { maxParagraphs: 8, maxChars: 3000 })
     expect(batches[0].skipIds).toEqual([0])
-    expect(batches[0].paragraphs).toEqual([])
+    // code 段落保留在 paragraphs 中：流水线按 id 原样写回（Task 23）
+    expect(batches[0].paragraphs).toEqual([code])
   })
 })

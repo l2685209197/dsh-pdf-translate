@@ -26,8 +26,9 @@ export function chunkParagraphs(paragraphs: Paragraph[], rule: ChunkRule): Trans
   for (const p of paragraphs) {
     const text = p.lines.map(l => l.text).join('\n')
     if (p.type === 'code') {
-      // 代码段：独立一批（skip），不占用正文批次
-      batches.push({ paragraphs: [], skipIds: [p.id] })
+      // 代码段：独立一批（skip），不占用正文批次；段落保留在 paragraphs 中，
+      // 供流水线（Task 23）按 id 原样写回译文
+      batches.push({ paragraphs: [p], skipIds: [p.id] })
       continue
     }
     if (current.length > 0 && (current.length >= rule.maxParagraphs || chars + text.length > rule.maxChars)) {
