@@ -1,0 +1,13 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    devDependencies:
+      '@deepseek-ai/dsh-tools':
+        specifier: link:E:/DSH Desktop/resources/app.asar.unpacked/node_modules/@deepseek-ai/dsh-tools
+        version: link:../../DSH Desktop/resources/app.asar.unpacked/node_modules/@deepseek-ai/dsh-tools

@@ -1,0 +1,7 @@
+﻿{
+  "name": "link-test",
+  "private": true,
+  "devDependencies": {
+    "@deepseek-ai/dsh-tools": "link:E:/DSH Desktop/resources/app.asar.unpacked/node_modules/@deepseek-ai/dsh-tools"
+  }
+}
