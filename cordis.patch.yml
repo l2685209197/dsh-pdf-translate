@@ -1,0 +1,17 @@
+# dsh-pdf-translate 挂载示例
+# 复制本 insert 行到你的 profile 补丁层：
+#   %USERPROFILE%\.dsh\profiles\<profile>\cordis.patch.yml
+# 桌面实例 patchReload: live，改动即时生效。
+- insert:
+    - id: pdf-translate
+      name: dsh-pdf-translate
+      config:
+        # 也可用 !!js process.env.DEEPSEEK_API_KEY?.trim() || '' 从环境变量读取
+        apiKey: ''
+        baseUrl: 'https://api.deepseek.com'
+        model: 'deepseek-chat'
+        langPair: 'en→zh'
+        concurrency: 6
+        maxRetries: 3
+        timeoutMs: 60000
+        pythonBin: 'python'
