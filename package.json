@@ -25,8 +25,8 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.1",
-    "@deepseek-ai/dsh-settings": "link:E:/DSH Desktop/resources/app.asar.unpacked/node_modules/@deepseek-ai/dsh-settings",
-    "@deepseek-ai/dsh-tools": "link:E:/DSH Desktop/resources/app.asar.unpacked/node_modules/@deepseek-ai/dsh-tools",
+    "@deepseek-ai/dsh-settings": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-tools": "0.1.1-rc.2",
     "@types/react": "^18.3.0",
     "esbuild": "^0.24.0",
     "react": "^18.3.1",
