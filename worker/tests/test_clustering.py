@@ -41,3 +41,36 @@ def test_first_line_indent_starts_new_paragraph():
     paras = extract.cluster_paragraphs(lines, page_width=600, page_height=800)
     assert len(paras) == 2
     assert paras[1].lines[0].bbox[0] == 96
+
+
+def test_style_change_breaks_paragraph():
+    lines = [
+        _line(72, 100, 300, 112, "normal line", size=12, font="Helvetica"),
+        _line(72, 112, 300, 124, "bigger line", size=14, font="Helvetica"),
+    ]
+    paras = extract.cluster_paragraphs(lines, page_width=600, page_height=800)
+    assert len(paras) == 2
+
+
+def test_column_seam_flushes_paragraph():
+    # 两列各一段（Task 7 修订：列边界无条件分段，列缝 y 间隙为负也不跨列合并）
+    lines = [
+        _line(50, 50, 200, 60, "L1a", size=12),
+        _line(50, 62, 200, 72, "L1b", size=12),
+        _line(350, 20, 500, 30, "R1a", size=12),
+        _line(350, 32, 500, 42, "R1b", size=12),
+    ]
+    paras = extract.cluster_paragraphs(lines, page_width=600, page_height=800)
+    assert len(paras) == 2
+
+
+def test_hanging_indent_list_keeps_continuation():
+    # 挂起缩进：bullet 行 + 缩进续行不拆断；下一项起始强制分段
+    lines = [
+        _line(72, 100, 300, 112, "- item one", size=12),
+        _line(96, 112, 300, 124, "  wrapped line", size=12),
+        _line(72, 124, 300, 136, "- next item", size=12),
+    ]
+    paras = extract.cluster_paragraphs(lines, page_width=600, page_height=800)
+    assert len(paras) == 2
+    assert [l.text for l in paras[0].lines] == ["- item one", "  wrapped line"]

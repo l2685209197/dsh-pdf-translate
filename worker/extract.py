@@ -1,6 +1,7 @@
 """文本层检测与段落提取。"""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -129,8 +130,11 @@ def _overlaps_x(a: Line, b: Line) -> bool:
     return min(a1, b1) - max(a0, b0) > 1.0
 
 
+_LIST_START = re.compile(r"^[\u2022\u2023\u25cf\u25aa\u25e6*\-]\s|^\d+[.)]\s|^[a-zA-Z][.)]\s")
+
+
 def _line_pitch(lines: list[Line]) -> float:
-    """典型行距中位数：同一 y 列内相邻行的 y 起点差。"""
+    """典型行距中位数：全部行按 y 排序后相邻起点差（跨列同行由 >0.5 过滤消除）。"""
     ys = sorted(l.bbox[1] for l in lines)
     gaps = [b - a for a, b in zip(ys, ys[1:]) if b - a > 0.5]
     if not gaps:
@@ -154,9 +158,9 @@ def _paragraph_segments(assignment: ColumnAssignment) -> list[list[Line]]:
 
 
 def cluster_paragraphs(lines: list[Line], page_width: float, page_height: float) -> list[Paragraph]:
-    """列检测 + 行合并 → 段落列表（阅读顺序）。"""
+    """列检测 + 行合并 → 段落列表（阅读顺序）。page_height 预留 Task 9 分类使用。"""
     assignment = assign_columns(lines, page_width)
-    pitch = _line_pitch(assignment.ordered) or 14.0
+    pitch = _line_pitch(assignment.ordered)
     paragraphs: list[Paragraph] = []
     current: list[Line] = []
 
@@ -164,7 +168,6 @@ def cluster_paragraphs(lines: list[Line], page_width: float, page_height: float)
         if not current:
             return
         first = current[0]
-        last = current[-1]
         bbox = (
             min(l.bbox[0] for l in current),
             min(l.bbox[1] for l in current),
@@ -189,9 +192,12 @@ def cluster_paragraphs(lines: list[Line], page_width: float, page_height: float)
                 continue
             prev = current[-1]
             gap = line.bbox[1] - prev.bbox[3]
-            # 断开条件：间隙过大 / 首行缩进 / 样式跳变
+            # 断开条件：列表项起始 / 间隙过大 / 首行缩进（挂起缩进续行除外）/ 样式跳变。
+            # 挂起缩进（bullet 行 + 缩进续行）不能按缩进拆断，否则续行会误并入下一项。
+            bullet_start = bool(_LIST_START.match(line.text.strip()))
             indent = line.bbox[0] - prev.bbox[0] > 12.0
-            if gap > pitch * 0.6 or indent or not _same_style(prev, line):
+            bullet_continuation = bool(_LIST_START.match(prev.text.strip()))
+            if bullet_start or gap > pitch * 0.6 or (indent and not bullet_continuation) or not _same_style(prev, line):
                 flush()
             current.append(line)
         flush()  # 段边界（全宽段/列边界）无条件分段——列缝处 y 间隙可能为负，
