@@ -36,6 +36,7 @@ def _span_flags(flags: int) -> dict[str, bool]:
         "bold": bool(flags & (1 << 4)),
         "italic": bool(flags & (1 << 1)),
         "underline": False,  # PyMuPDF dict 不直接给下划线；由字体名启发式兜底
+        "mono": bool(flags & (1 << 3)),
     }
 
 
@@ -208,15 +209,19 @@ def cluster_paragraphs(lines: list[Line], page_width: float, page_height: float)
     return paragraphs
 
 
-_MONO_FONT = re.compile(r"(?i)mono|courier|consolas|menlo|source|code|typewriter")
+# 等宽字体名回退（span.mono 标志来自 PyMuPDF flags 2^3，优先；此处兜底子集字体名）。
+# 勿用裸 `source|code|typewriter`：SourceHanSans/SourceSans/SourceSerif/AmericanTypewriter
+# 等比例字体会被误判为等宽，导致整页代码跳过翻译。
+_MONO_FONT_RE = re.compile(
+    r"(?i)mono|courier|consolas|menlo|monaco|lucidaconsole|inconsolata|sourcecodepro"
+)
 
 
 def _is_monospace(para: Paragraph) -> bool:
-    for line in para.lines:
-        for span in line.spans:
-            if _MONO_FONT.search(span.font):
-                return True
-    return False
+    """主导样式判定：首行首 span 等宽（span.mono 或字体名）即视为代码段。
+    仅查首 span：正文中内联代码 span 不应把整个段落判为代码。"""
+    first_span = para.lines[0].spans[0]
+    return first_span.mono or _MONO_FONT_RE.search(first_span.font) is not None
 
 
 def _body_size(para: Paragraph) -> float:

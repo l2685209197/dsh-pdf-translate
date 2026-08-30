@@ -16,6 +16,7 @@ class Span:
     italic: bool
     underline: bool
     origin: tuple[float, float]  # 首字符基线原点 [x, y]
+    mono: bool = False  # 等宽（PyMuPDF span flags 2^3）；extract 填充，协议扩展字段
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -28,6 +29,7 @@ class Span:
             "italic": self.italic,
             "underline": self.underline,
             "origin": list(self.origin),
+            "mono": self.mono,
         }
 
 
