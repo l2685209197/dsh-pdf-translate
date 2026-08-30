@@ -1,9 +1,15 @@
 from worker import extract
-from worker.model import Line
+from worker.model import Line, Span
 
 
 def _line(x0, y0, x1, y1, text="t", size=12.0, font="Helvetica"):
-    return Line(text=text, bbox=(x0, y0, x1, y1), origin=(x0, y1 - size * 0.8))
+    bbox = (x0, y0, x1, y1)
+    return Line(
+        text=text, bbox=bbox, origin=(x0, y1 - size * 0.8),
+        # 夹具行需携带 span：_same_style 读取 spans[0]（生产数据恒有 ≥1 span）
+        spans=[Span(text=text, bbox=bbox, font=font, size=size, color="#000000",
+                    bold=False, italic=False, underline=False, origin=(x0, y1 - size * 0.8))],
+    )
 
 
 def test_merge_close_lines_same_style():

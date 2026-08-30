@@ -140,8 +140,6 @@ def _line_pitch(lines: list[Line]) -> float:
 
 
 def _same_style(a: Line, b: Line) -> bool:
-    if not a.spans or not b.spans:
-        return True  # 无 span 信息的 Line（测试夹具）视为同样式
     sa, sb = a.spans[0], b.spans[0]
     return abs(sa.size - sb.size) < 1.0 and sa.font == sb.font
 
