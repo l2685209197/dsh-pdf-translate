@@ -68,4 +68,49 @@ describe('DeepSeekClient', () => {
     const client = new DeepSeekClient({ apiKey: 'k', baseUrl: 'x', model: 'm', timeoutMs: 5000, maxRetries: 0 }, fetchImpl)
     await expect(client.translateBatch({ paragraphs: [{ id: 1, text: 'hi' }] }, new AbortController().signal)).rejects.toThrow(/missing/)
   })
+
+  it('401 立即抛错不重试', async () => {
+    let calls = 0
+    const fetchImpl = mockFetch(async () => {
+      calls += 1
+      return new Response('no', { status: 401 })
+    })
+    const client = new DeepSeekClient({ apiKey: 'k', baseUrl: 'x', model: 'm', timeoutMs: 5000, maxRetries: 3 }, fetchImpl)
+    await expect(client.translateBatch({ paragraphs: [{ id: 1, text: 'hi' }] }, new AbortController().signal)).rejects.toThrow(/auth/)
+    expect(calls).toBe(1)
+  })
+
+  it('重试耗尽抛最后错误', async () => {
+    const fetchImpl = mockFetch(async () => new Response('x', { status: 503 }))
+    const client = new DeepSeekClient({ apiKey: 'k', baseUrl: 'x', model: 'm', timeoutMs: 5000, maxRetries: 1, retryBaseMs: 1 }, fetchImpl)
+    await expect(client.translateBatch({ paragraphs: [{ id: 1, text: 'hi' }] }, new AbortController().signal)).rejects.toThrow(/503/)
+  })
+
+  it('请求携带 Bearer 与 json_object', async () => {
+    let captured: RequestInit | undefined
+    const fetchImpl = mockFetch(async (_url, init) => {
+      captured = init
+      return new Response(JSON.stringify({ choices: [{ message: { content: '{"1":"x"}' } }] }), { status: 200 })
+    })
+    const client = new DeepSeekClient({ apiKey: 'k', baseUrl: 'https://api.deepseek.com', model: 'm', timeoutMs: 5000, maxRetries: 0 }, fetchImpl)
+    await client.translateBatch({ paragraphs: [{ id: 1, text: 'hi' }] }, new AbortController().signal)
+    const headers = captured?.headers as Record<string, string> | undefined
+    expect(headers?.['authorization']).toBe('Bearer k')
+    const body = JSON.parse(String(captured?.body)) as { response_format?: { type?: string } }
+    expect(body.response_format?.type).toBe('json_object')
+  })
+
+  it('调用方信号中止时立即抛错不重试', async () => {
+    let calls = 0
+    const fetchImpl = mockFetch(async () => {
+      calls += 1
+      await new Promise(r => setTimeout(r, 50))
+      return new Response(JSON.stringify({ choices: [{ message: { content: '{"1":"x"}' } }] }), { status: 200 })
+    })
+    const ac = new AbortController()
+    ac.abort() // 预先中止：模拟 exec.signal 取消后的排队调用
+    const client = new DeepSeekClient({ apiKey: 'k', baseUrl: 'x', model: 'm', timeoutMs: 5000, maxRetries: 3, retryBaseMs: 1 }, fetchImpl)
+    await expect(client.translateBatch({ paragraphs: [{ id: 1, text: 'hi' }] }, ac.signal)).rejects.toThrow(/abort/i)
+    expect(calls).toBe(0) // 未发起请求
+  })
 })

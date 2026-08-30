@@ -59,10 +59,17 @@ export class DeepSeekClient {
     }
 
     let lastError: unknown
+    let retryAfterMs = 0
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      // 调用方信号中止（如 exec.signal 取消）：立即抛错，绝不进入重试路径
+      // （fetch 的 AbortError 消息会匹配 /abort/i → 误分类为 timeout 并重试）
+      if (signal.aborted) {
+        throw signal.reason instanceof Error ? signal.reason : new DOMException('aborted', 'AbortError')
+      }
       if (attempt > 0) {
         const base = this.config.retryBaseMs ?? 500
-        await new Promise(r => setTimeout(r, base * 2 ** (attempt - 1) + Math.random() * 100))
+        // 429 时按 Retry-After 退避（规格 §5.3），否则指数退避 + 抖动
+        await new Promise(r => setTimeout(r, Math.max(base * 2 ** (attempt - 1) + Math.random() * 100, retryAfterMs)))
       }
       try {
         // 超时由客户端计时器强制（mock/真实 fetch 均生效）：
@@ -94,7 +101,16 @@ export class DeepSeekClient {
           clearTimeout(timer)
         }
         if (resp.status === 429 || resp.status >= 500) {
-          lastError = new DeepSeekError(`http ${resp.status}`, resp.status)
+          // 读取错误体（保留 API 的错误详情供报告展示；同时释放 socket）
+          const detail = await resp.text().catch(() => '')
+          if (resp.status === 429) {
+            const ra = Number(resp.headers.get('retry-after'))
+            if (Number.isFinite(ra) && ra > 0) retryAfterMs = Math.max(retryAfterMs, ra * 1000)
+          }
+          lastError = new DeepSeekError(
+            `http ${resp.status}${detail ? `: ${detail.trim().slice(0, 200)}` : ''}`,
+            resp.status,
+          )
           continue
         }
         if (resp.status === 401 || resp.status === 403) {
@@ -103,15 +119,26 @@ export class DeepSeekClient {
         if (!resp.ok) {
           throw new DeepSeekError(`http ${resp.status}`, resp.status)
         }
-        const data = (await resp.json()) as {
+        let data: {
           choices?: { message?: { content?: string } }[]
           usage?: { prompt_tokens?: number; completion_tokens?: number }
+        }
+        try {
+          data = (await resp.json()) as typeof data
+        } catch {
+          throw new DeepSeekError('invalid response: body is not JSON')
         }
         const content = data.choices?.[0]?.message?.content
         if (content === undefined) {
           throw new DeepSeekError('empty response content')
         }
-        const translations = parseBatchResponse(content, input.paragraphs.map(p => p.id))
+        let translations: Map<number, string>
+        try {
+          translations = parseBatchResponse(content, input.paragraphs.map(p => p.id))
+        } catch (e) {
+          // 解析失败归为 invalid-response（非网络错误；立即抛出不重试）
+          throw new DeepSeekError(`invalid response: ${e instanceof Error ? e.message : String(e)}`)
+        }
         return {
           translations,
           usage: {
@@ -120,6 +147,9 @@ export class DeepSeekClient {
           },
         }
       } catch (e) {
+        if (signal.aborted) {
+          throw signal.reason instanceof Error ? signal.reason : new DOMException('aborted', 'AbortError')
+        }
         lastError = e
         if (classifyError(e) !== 'rate-limit' && classifyError(e) !== 'server' && classifyError(e) !== 'timeout') {
           throw e
