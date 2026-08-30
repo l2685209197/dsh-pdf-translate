@@ -27,7 +27,8 @@ export function chunkParagraphs(paragraphs: Paragraph[], rule: ChunkRule): Trans
     const text = p.lines.map(l => l.text).join('\n')
     if (p.type === 'code') {
       // 代码段：独立一批（skip），不占用正文批次；段落保留在 paragraphs 中，
-      // 供流水线（Task 23）按 id 原样写回译文
+      // 供流水线（Task 23）按 id 原样写回译文。先 flush 当前正文批次以保持文档顺序。
+      flush()
       batches.push({ paragraphs: [p], skipIds: [p.id] })
       continue
     }

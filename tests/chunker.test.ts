@@ -40,4 +40,10 @@ describe('chunkParagraphs', () => {
     // code 段落保留在 paragraphs 中：流水线按 id 原样写回（Task 23）
     expect(batches[0].paragraphs).toEqual([code])
   })
+
+  it('code 批次保持文档顺序', () => {
+    const paras = [para(0, 'a'), para(1, 'b'), para(2, 'code', 'code'), para(3, 'c')]
+    const batches = chunkParagraphs(paras, { maxParagraphs: 8, maxChars: 3000 })
+    expect(batches.map(b => b.paragraphs.map(p => p.id))).toEqual([[0, 1], [2], [3]])
+  })
 })
