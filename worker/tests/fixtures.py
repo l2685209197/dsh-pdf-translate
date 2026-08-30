@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import fitz
+import pymupdf as fitz  # 1.28.2 的 fitz shim 会在 stdout 打印弃用警告（测试内无碍，但约定统一）
 
 
 def make_text_pdf(path: Path, pages: int = 1) -> Path:
