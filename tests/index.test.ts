@@ -47,6 +47,28 @@ describe('pdf-translate 插件入口', () => {
     expect(JSON.parse(JSON.stringify(Config))).not.toHaveProperty('schema')
   })
 
+  it.each([
+    ['concurrency', 0, { concurrency: 0 }],
+    ['concurrency', 17, { concurrency: 17 }],
+    ['concurrency', 1.5, { concurrency: 1.5 }],
+    ['maxRetries', -1, { maxRetries: -1 }],
+    ['maxRetries', 11, { maxRetries: 11 }],
+    ['maxRetries', 1.5, { maxRetries: 1.5 }],
+    ['timeoutMs', 999, { timeoutMs: 999 }],
+  ] as const)('Config 拒绝无效的 %s=%s', (_field, _value, overrides) => {
+    expect(() => createConfig(overrides)).toThrow()
+  })
+
+  it.each([
+    ['concurrency', 1, { concurrency: 1 }],
+    ['concurrency', 16, { concurrency: 16 }],
+    ['maxRetries', 0, { maxRetries: 0 }],
+    ['maxRetries', 10, { maxRetries: 10 }],
+    ['timeoutMs', 1000, { timeoutMs: 1000 }],
+  ] as const)('Config 接受边界值 %s=%s', (_field, _value, overrides) => {
+    expect(createConfig(overrides)).toMatchObject(overrides)
+  })
+
   it('settings provider 更新后，工具配置回调读取保存的最新来源 thunk', () => {
     let current = createConfig({ model: 'provider-initial' })
     const registrations: string[] = []
