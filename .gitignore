@@ -7,3 +7,4 @@ __pycache__/
 worker/.venv/
 *.log
 .superpowers/
+.worktrees/
