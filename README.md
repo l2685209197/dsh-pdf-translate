@@ -27,7 +27,7 @@ DSH（DeepSeek Harness）插件：用用户自有的 DeepSeek（或任意 OpenAI
 | 插件集成 | Task 25-27（apply 入口、设置卡片、挂载/README/安装脚本） | ⏸ 待实现 |
 | E2E/QA | Task 28-29（mock DeepSeek 全流程、PDFium 渲染对比） | ⏸ 待实现 |
 
-实施计划见 `docs/superpowers/plans/2026-08-30-dsh-pdf-translate.md`；设计规格见 `docs/superpowers/specs/2026-08-30-dsh-pdf-translate-design.md`。
+实施计划见 `docs/superpowers/plans/2026-08-30-dsh-pdf-translate.md`；设计规格见 `docs/superpowers/specs/2026-08-30-dsh-pdf-translate-design.md`；继续开发的交接说明见 `docs/HANDOFF.md`。
 
 ## 环境要求
 
