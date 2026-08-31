@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { createInterface, type Interface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
@@ -34,6 +35,12 @@ export class PdfWorker {
     })
     proc.on('error', err => {
       for (const entry of this.pending.values()) entry.reject(err)
+      this.pending.clear()
+    })
+    // 进程退出（无 'error' 事件，如 stdin EOF/外部 kill/OOM）时拒绝所有挂起命令，
+    // 防止管道调用方永久挂起（Task 22 质量审查）
+    proc.on('exit', () => {
+      for (const entry of this.pending.values()) entry.reject(new Error('worker exited'))
       this.pending.clear()
     })
   }
@@ -79,9 +86,17 @@ export class PdfWorker {
   }
 }
 
-// 相对深度 ../../ 使源码（src/worker.ts）与构建产物（lib/types/worker.js）
-// 两种位置都解析到包根下的 worker/（lib/types/../../worker = <pkg>/worker）。
-export const workerScriptPath = fileURLToPath(new URL('../../worker/main.py', import.meta.url))
+// 源码（src/worker.ts）与构建产物（lib/types/worker.js）相对深度不同，
+// 无法用单一固定深度解析；逐级上探直到找到 worker/main.py（插件包根下必有）。
+function resolveWorkerScriptPath(): string {
+  for (const depth of ['../../worker/main.py', '../worker/main.py']) {
+    const p = fileURLToPath(new URL(depth, import.meta.url))
+    if (existsSync(p)) return p
+  }
+  return fileURLToPath(new URL('../../worker/main.py', import.meta.url))
+}
+
+export const workerScriptPath = resolveWorkerScriptPath()
 export const workerRepoRoot = dirname(dirname(workerScriptPath))
 
 // 真实 worker 必须用 `python -u -m worker.main`（cwd = 仓库根）：
