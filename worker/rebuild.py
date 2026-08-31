@@ -60,7 +60,10 @@ def _cover_and_write(
     # 字体下的自然宽度扩右边，避免 insert_textbox 折行。get_text_length 无 fontfile 参数
     # （1.28.2 签名只有 text/fontname/fontsize/encoding），文件字体改用 fitz.Font 度量。
     if fontfile is not None:
-        text_width = fitz.Font(fontname=fontname, fontfile=fontfile).text_length(text, fontsize=fontsize)
+        try:
+            text_width = fitz.Font(fontname=fontname, fontfile=fontfile).text_length(text, fontsize=fontsize)
+        except Exception:  # noqa: BLE001 - 字体文件损坏时回退内置度量，不让单段拖垮整次重建
+            text_width = fitz.get_text_length(text, fontname="china-s", fontsize=fontsize)
     else:
         text_width = fitz.get_text_length(text, fontname=fontname, fontsize=fontsize)
     if rect.x0 + text_width > write_rect.x1:
@@ -108,12 +111,14 @@ def rebuild_document(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 _BASE14 = {
-    "helvetica": ("helv", None),
+    # 顺序关键：更长前缀（helvetica-bold）必须在前，否则 startswith("helvetica")
+    # 先命中、bold 权重静默丢失（hebo 不可达）
     "helvetica-bold": ("hebo", None),
-    "times": ("tiro", None),
+    "helvetica": ("helv", None),
     "times-roman": ("tiro", None),
-    "courier": ("cour", None),
+    "times": ("tiro", None),
     "couriernew": ("cour", None),
+    "courier": ("cour", None),
     "symbol": ("symb", None),
     "zapfdingbats": ("zadb", None),
 }
