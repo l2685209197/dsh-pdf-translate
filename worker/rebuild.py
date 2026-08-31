@@ -39,7 +39,7 @@ def _cover_and_write(page: fitz.Page, para: dict[str, Any], text: str, resolver:
     fontsize = float(first_span["size"])
     color = _hex_to_rgb(first_span["color"])
 
-    page.add_redact_annot(rect + (-2, -2, 2, 2), fill=(1, 1, 1))
+    page.add_redact_annot(_redact_rect(para), fill=(1, 1, 1))
     # 注：pymupdf 1.28.2 的 apply_redactions 签名是 (images, graphics, text)，
     # 已无 annots 参数（旧版 PDF_REDACT_ANNOTS_* 常量随之移除）。此版本行为：
     # 非链接注释保留；**与 redaction 区域相交的链接注释（URI link）会被删除**——
@@ -123,6 +123,18 @@ def _write_with_overflow_handling(
     return warnings
 
 
+_REDACT_PAD = 2.0  # redaction 覆盖矩形的外扩边距（捕获链接与覆盖共用，防漂移）
+
+
+def _redact_rect(para: dict[str, Any]) -> fitz.Rect:
+    """redaction 覆盖矩形 = 段落 bbox 外扩 _REDACT_PAD pt。
+
+    _capture_links 与 _cover_and_write 共用同一构造：若只按未扩宽的 bbox 捕获，
+    落在 2pt 边带内的链接会被 redaction 删除却未被捕获（静默丢失）。
+    """
+    return fitz.Rect(*para["bbox"]) + (-_REDACT_PAD, -_REDACT_PAD, _REDACT_PAD, _REDACT_PAD)
+
+
 def _capture_links(page: fitz.Page, rects: list[fitz.Rect]) -> list[dict[str, Any]]:
     """捕获与任一待 redact 段落矩形相交的链接（redaction 会删除它们）。"""
     captured: list[dict[str, Any]] = []
@@ -155,12 +167,14 @@ def rebuild_document(payload: dict[str, Any]) -> dict[str, Any]:
             geometry = _geometry_map(_extract_geometry(doc, index))
             # Task 21：pymupdf 1.28.2 的 redaction 会删除与区域相交的链接注释，
             # 先捕获本页将被 redact 的段落矩形相交的链接，写完后恢复。
+            # 捕获矩形与 _cover_and_write 的覆盖矩形必须一致（_redact_rect），
+            # 否则 2pt 边带内的链接会被删除却未捕获。
             redact_rects: list[fitz.Rect] = []
             for item in page_payload.get("paragraphs", []):
                 para_id = int(item["id"])
                 para = geometry.get(para_id)
                 if para is not None and item.get("text", "").strip():
-                    redact_rects.append(fitz.Rect(*para["bbox"]))
+                    redact_rects.append(_redact_rect(para))
             captured_links = _capture_links(page, redact_rects)
             for item in page_payload.get("paragraphs", []):
                 para_id = int(item["id"])
