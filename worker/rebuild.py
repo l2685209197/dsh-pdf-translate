@@ -31,20 +31,15 @@ def _hex_to_rgb(color: str) -> tuple[float, float, float]:
     return tuple(int(value[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
 
 
-def _cover_and_write(
-    page: fitz.Page, para: dict[str, Any], text: str, resolver: FontResolver
-) -> list[dict[str, Any]]:
+def _cover_and_write(page: fitz.Page, para: dict[str, Any], text: str, resolver: FontResolver) -> list[dict[str, Any]]:
     warnings: list[dict[str, Any]] = []
     rect = fitz.Rect(*para["bbox"])
     first_span = para["lines"][0]["spans"][0]
-    anchor_x, anchor_y = first_span["origin"]
+    anchor_y = first_span["origin"][1]
     fontsize = float(first_span["size"])
     color = _hex_to_rgb(first_span["color"])
-    # Task 19：写入前先解析字体——CJK 译文必须落到 CJK 字体（helv 度量严重偏窄，
-    # 否则 bbox 不扩宽、译文在原文框内折行）。
-    fontname, fontfile = resolver.resolve(font=first_span["font"], text=text, lang="")
 
-    page.add_redact_annot(rect, fill=(1, 1, 1))
+    page.add_redact_annot(rect + (-2, -2, 2, 2), fill=(1, 1, 1))
     # 注：pymupdf 1.28.2 的 apply_redactions 签名是 (images, graphics, text)，
     # 已无 annots 参数（旧版 PDF_REDACT_ANNOTS_* 常量随之移除）。此版本行为：
     # 非链接注释保留；**与 redaction 区域相交的链接注释（URI link）会被删除**——
@@ -54,31 +49,77 @@ def _cover_and_write(
         graphics=fitz.PDF_REDACT_LINE_ART_NONE,
         text=fitz.PDF_REDACT_TEXT_REMOVE,
     )
+    warnings.extend(
+        _write_with_overflow_handling(page, para["id"], text, rect, anchor_y, fontsize, color, resolver, first_span["font"])
+    )
+    return warnings
 
+
+def _write_with_overflow_handling(
+    page: fitz.Page, para_id: int, text: str, rect: fitz.Rect,
+    anchor_y: float, fontsize: float, color: tuple[float, float, float],
+    resolver: FontResolver, font: str,
+) -> list[dict[str, Any]]:
+    """溢出三级链：① 微缩字号（≥0.8×）→ ② 放宽行距 → ③ 区域外溢逐行写入并标注。
+
+    color 为 RGB 0..1 元组（_hex_to_rgb 产物）；宽度按解析后字体扩右边（Task 19），
+    避免单行译文在段落宽度内提前折行——本链处理的是**纵向**放不下的情况。
+    """
+    warnings: list[dict[str, Any]] = []
+    fontname, fontfile = resolver.resolve(font=font, text=text, lang="")
     write_rect = fitz.Rect(rect.x0, anchor_y - fontsize, rect.x1, rect.y1 + 50)
-    # 译文可能比原文宽（如 "translated line" 74.7pt vs 原 bbox 65.4pt）；按译文在解析后
-    # 字体下的自然宽度扩右边，避免 insert_textbox 折行。get_text_length 无 fontfile 参数
-    # （1.28.2 签名只有 text/fontname/fontsize/encoding），文件字体改用 fitz.Font 度量。
     if fontfile is not None:
         try:
             text_width = fitz.Font(fontname=fontname, fontfile=fontfile).text_length(text, fontsize=fontsize)
-        except Exception:  # noqa: BLE001 - 字体文件损坏时回退内置度量，不让单段拖垮整次重建
+        except Exception:  # noqa: BLE001
             text_width = fitz.get_text_length(text, fontname="china-s", fontsize=fontsize)
     else:
         text_width = fitz.get_text_length(text, fontname=fontname, fontsize=fontsize)
     if rect.x0 + text_width > write_rect.x1:
-        write_rect.x1 = rect.x0 + text_width + 1.0
-    used = page.insert_textbox(
-        write_rect,
-        text,
-        fontsize=fontsize,
-        color=color,
-        align=fitz.TEXT_ALIGN_LEFT,
-        fontname=fontname,
-        fontfile=fontfile,
-    )
-    if used < 0:
-        warnings.append({"page": page.number, "paraId": para["id"], "kind": "overflow", "detail": "text does not fit"})
+        # 扩宽但有界：上限为页面右缘。无界扩宽会让任何文本都能排成单行
+        # （矩形高度 ~65pt >> 单行 ~14pt），纵向溢出永远不可达、三级链形同虚设；
+        # 封顶后极端长译文才会在页面宽度内折行，链 ① 才有机会触发。
+        write_rect.x1 = min(rect.x0 + text_width + 1.0, page.rect.x1)
+
+    # 三级链 ①：微缩字号（≥ 0.8× 原字号）
+    size = fontsize
+    last_tried = fontsize
+    while size >= fontsize * 0.8:
+        used = page.insert_textbox(
+            write_rect, text, fontsize=size, color=color,
+            align=fitz.TEXT_ALIGN_LEFT, fontname=fontname, fontfile=fontfile,
+            lineheight=1.2,
+        )
+        if used >= 0:
+            if size < fontsize - 0.5:
+                warnings.append({"page": page.number, "paraId": para_id, "kind": "overflow",
+                                 "detail": f"fontsize scaled {fontsize:.1f}→{size:.1f}"})
+            return warnings
+        last_tried = size
+        size = round(size * 0.9, 2)
+    # 循环退出时 size 已指向未尝试的下一档（可能跌破 0.8× 下限）；回退到最后尝试过的档位，
+    # 让链 ②/③ 使用仍在 ≥0.8× 下限内的字号。
+    size = last_tried
+
+    # 三级链 ②：放宽行距到 1.4（简单起见重试一次 lineheight）
+    for lineheight in (1.4,):
+        used = page.insert_textbox(
+            write_rect, text, fontsize=size, color=color,
+            align=fitz.TEXT_ALIGN_LEFT, fontname=fontname, fontfile=fontfile,
+            lineheight=lineheight,
+        )
+        if used >= 0:
+            return warnings
+
+    # 三级链 ③：允许溢出——逐行写入（超出段落区域底边），并标注
+    y = anchor_y
+    for raw_line in text.splitlines() or [text]:
+        line_text = raw_line if raw_line else " "
+        page.insert_text((rect.x0, y), line_text, fontsize=size, color=color,
+                         fontname=fontname, fontfile=fontfile)
+        y += size * 1.2
+    warnings.append({"page": page.number, "paraId": para_id, "kind": "overflow",
+                     "detail": "text written beyond paragraph region"})
     return warnings
 
 
