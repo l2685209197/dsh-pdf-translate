@@ -21,10 +21,9 @@ DSH（DeepSeek Harness）插件：用用户自有的 DeepSeek（或任意 OpenAI
 | 仓库脚手架 | Task 1-3（package.json/tsconfig/vitest/pytest/pymupdf/协议数据模型） | ✅ 完成 |
 | worker 协议与提取 | Task 4-11（stdio 协议、文本层检测、行/span 归一化、列检测、段落聚类、分类、置信度降级、extract 命令 + 6 类黄金版式精确率/召回率测试，全部 1.000） | ✅ 完成 |
 | TS 翻译模块 | Task 12-16（协议类型、分块器、提示词/解析、DeepSeek 客户端、并发池、译文缓存） | ✅ 完成 |
-| Python 重建 | Task 17（redaction 覆盖 + insert_textbox 写入 + 几何按 id 匹配） | ✅ 完成 |
-| 重建深化 | Task 18-21（字体回退、溢出三级链、代码/表格直写、链接保留） | ⏸ 待实现 |
-| 流水线/工具 | Task 22-24（worker 进程管理、流水线编排、translate_pdf 工具） | ⏸ 待实现 |
-| 插件集成 | Task 25-27（apply 入口、设置卡片、挂载/README/安装脚本） | ⏸ 待实现 |
+| Python 重建 | Task 17-21（redaction 覆盖、几何按 id 匹配、字体回退、溢出三级链、链接捕获-恢复、代码直写） | ✅ 完成 |
+| 流水线/工具 | Task 22-23（worker 进程管理、流水线编排） | ✅ 完成 |
+| 工具/集成 | Task 24-27（translate_pdf 工具、apply 入口、设置卡片、挂载/安装脚本） | ⏸ 待实现 |
 | E2E/QA | Task 28-29（mock DeepSeek 全流程、PDFium 渲染对比） | ⏸ 待实现 |
 
 实施计划见 `docs/superpowers/plans/2026-08-30-dsh-pdf-translate.md`；设计规格见 `docs/superpowers/specs/2026-08-30-dsh-pdf-translate-design.md`；继续开发的交接说明见 `docs/HANDOFF.md`。
