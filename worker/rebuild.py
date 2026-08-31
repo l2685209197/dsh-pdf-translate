@@ -123,6 +123,24 @@ def _write_with_overflow_handling(
     return warnings
 
 
+def _capture_links(page: fitz.Page, rects: list[fitz.Rect]) -> list[dict[str, Any]]:
+    """捕获与任一待 redact 段落矩形相交的链接（redaction 会删除它们）。"""
+    captured: list[dict[str, Any]] = []
+    for link in page.get_links():
+        link_rect = fitz.Rect(link.get("from"))
+        if any(link_rect.intersects(r) for r in rects):
+            captured.append(link)
+    return captured
+
+
+def _restore_links(page: fitz.Page, links: list[dict[str, Any]]) -> None:
+    """恢复捕获的链接；仅补回 redaction 后已不存在的（避免重复）。"""
+    for link in links:
+        link_rect = fitz.Rect(link.get("from"))
+        if not any(fitz.Rect(existing.get("from")) == link_rect for existing in page.get_links()):
+            page.insert_link(link)
+
+
 def rebuild_document(payload: dict[str, Any]) -> dict[str, Any]:
     input_path = payload["inputPath"]
     output_path = payload["outputPath"]
@@ -135,6 +153,15 @@ def rebuild_document(payload: dict[str, Any]) -> dict[str, Any]:
             index = int(page_payload["index"])
             page = doc[index]
             geometry = _geometry_map(_extract_geometry(doc, index))
+            # Task 21：pymupdf 1.28.2 的 redaction 会删除与区域相交的链接注释，
+            # 先捕获本页将被 redact 的段落矩形相交的链接，写完后恢复。
+            redact_rects: list[fitz.Rect] = []
+            for item in page_payload.get("paragraphs", []):
+                para_id = int(item["id"])
+                para = geometry.get(para_id)
+                if para is not None and item.get("text", "").strip():
+                    redact_rects.append(fitz.Rect(*para["bbox"]))
+            captured_links = _capture_links(page, redact_rects)
             for item in page_payload.get("paragraphs", []):
                 para_id = int(item["id"])
                 text = item["text"]
@@ -145,6 +172,7 @@ def rebuild_document(payload: dict[str, Any]) -> dict[str, Any]:
                 if not text.strip():
                     continue
                 warnings.extend(_cover_and_write(page, para, text, resolver))
+            _restore_links(page, captured_links)
         doc.save(output_path, incremental=False, garbage=3, deflate=True)
         return {"warnings": warnings}
     finally:
