@@ -66,6 +66,12 @@ export class PdfWorker {
 
   dispose(): Promise<void> {
     return new Promise(resolve => {
+      // 进程可能已退出（exitCode 已置位）：exit 事件不会再触发，直接完成
+      if (this.proc.exitCode !== null) {
+        this.rl.close()
+        resolve()
+        return
+      }
       this.proc.on('exit', () => resolve())
       this.proc.kill()
       this.rl.close()
@@ -73,7 +79,9 @@ export class PdfWorker {
   }
 }
 
-export const workerScriptPath = fileURLToPath(new URL('../worker/main.py', import.meta.url))
+// 相对深度 ../../ 使源码（src/worker.ts）与构建产物（lib/types/worker.js）
+// 两种位置都解析到包根下的 worker/（lib/types/../../worker = <pkg>/worker）。
+export const workerScriptPath = fileURLToPath(new URL('../../worker/main.py', import.meta.url))
 export const workerRepoRoot = dirname(dirname(workerScriptPath))
 
 // 真实 worker 必须用 `python -u -m worker.main`（cwd = 仓库根）：
