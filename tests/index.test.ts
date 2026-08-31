@@ -1,5 +1,24 @@
-import { describe, expect, it } from 'vitest'
-import { apply, Config, inject, NS, name } from '../src/index.js'
+import { describe, expect, it, vi } from 'vitest'
+import type { ToolConfig } from '../src/tool.js'
+
+const toolModule = vi.hoisted(() => ({
+  defineTranslateTool: vi.fn((deps: { config: () => ToolConfig }) => ({
+    name: 'translate_pdf',
+    config: deps.config,
+  })),
+}))
+
+vi.mock('../src/tool.js', () => toolModule)
+
+import { apply, Config, inject, NS, name, type Config as PluginConfig } from '../src/index.js'
+
+function createConfig(overrides: Partial<PluginConfig> = {}): PluginConfig {
+  return Config(overrides as PluginConfig)
+}
+
+function latestToolConfig(): () => ToolConfig {
+  return toolModule.defineTranslateTool.mock.calls.at(-1)![0].config
+}
 
 describe('pdf-translate 插件入口', () => {
   it('导出固定插件元数据', () => {
@@ -9,15 +28,7 @@ describe('pdf-translate 插件入口', () => {
   })
 
   it('Config 提供 Task 25 的全部默认值', () => {
-    const cfg = Config({}) as {
-      baseUrl: string
-      model: string
-      langPair: string
-      concurrency: number
-      maxRetries: number
-      timeoutMs: number
-      pythonBin: string
-    }
+    const cfg = createConfig()
     expect(cfg).toMatchObject({
       baseUrl: 'https://api.deepseek.com',
       model: 'deepseek-chat',
@@ -36,13 +47,62 @@ describe('pdf-translate 插件入口', () => {
     expect(JSON.parse(JSON.stringify(Config))).not.toHaveProperty('schema')
   })
 
-  it('headless 没有 settings provider 时仍注册工具', () => {
+  it('settings provider 更新后，工具配置回调读取保存的最新来源 thunk', () => {
+    let current = createConfig({ model: 'provider-initial' })
     const registrations: string[] = []
     const ctx = {
-      tools: { register: (t: { name: string }) => { registrations.push(t.name) } },
+      tools: { register: (tool: { name: string }) => { registrations.push(tool.name) } },
       jobs: {},
-    } as never
-    apply(ctx as never, Config({}) as never)
+      inject: (_dependencies: string[], callback: (scope: object) => void) => {
+        callback({
+          settings: {
+            register: () => ({
+              get: () => current,
+              watch: () => () => {},
+            }),
+          },
+          effect: () => {},
+        })
+      },
+    }
+
+    apply(ctx as never, createConfig({ model: 'entry' }))
+    current = createConfig({ model: 'provider-updated' })
+
     expect(registrations).toContain('translate_pdf')
+    expect(latestToolConfig()().model).toBe('provider-updated')
+  })
+
+  it('有合理 inject 但没有 settings provider 时仍注册工具并使用入口配置', () => {
+    const registrations: string[] = []
+    const entry = createConfig({ model: 'entry-only' })
+    const ctx = {
+      tools: { register: (tool: { name: string }) => { registrations.push(tool.name) } },
+      jobs: {},
+      // Cordis optional injection creates a pending fiber; the callback waits for settings.
+      inject: () => undefined,
+    }
+
+    apply(ctx as never, entry)
+
+    expect(registrations).toContain('translate_pdf')
+    expect(latestToolConfig()()).toBe(entry)
+  })
+
+  it('settings 安装期间的非缺服务错误不会被静默吞掉', () => {
+    const error = new Error('settings registration failed')
+    const ctx = {
+      tools: { register: vi.fn() },
+      jobs: {},
+      inject: (_dependencies: string[], callback: (scope: object) => void) => {
+        callback({
+          settings: { register: () => { throw error } },
+          effect: () => {},
+        })
+      },
+    }
+
+    expect(() => apply(ctx as never, createConfig())).toThrow(error)
+    expect(ctx.tools.register).not.toHaveBeenCalled()
   })
 })
