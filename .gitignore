@@ -6,5 +6,6 @@ __pycache__/
 .pytest_cache/
 worker/.venv/
 *.log
+build/
 .superpowers/
 .worktrees/

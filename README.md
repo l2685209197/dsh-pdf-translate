@@ -183,3 +183,21 @@ pnpm exec tsc -p tsconfig.json --noEmit
 2. **流水线**：worker 进程管理、校验→提取→翻译→重建→报告、translate_pdf 工具。
 3. **集成**：apply 入口（工具注册 + 设置命名空间）、设置卡片（client 半侧）、挂载到桌面 profile、README 完善。
 4. **E2E 与 QA**：mock DeepSeek 全流程、PDFium 渲染原文/译文对比。
+
+## QA 记录（Task 29：PDFium 渲染对比）
+
+**样例**：Task 28 E2E 产物（`tests/e2e` 的 mock DeepSeek 全流程输出）——`src.pdf`（3 页，每页一段 `page N content`，12pt Helvetica，插入点 (72,100)）与 `out.pdf`（译文版）。
+
+**冒烟命令**（scale 2.0 → 每页 1190×1684px）：
+
+```bash
+tools/pdf-render/build/Release/pdf_render.exe <input.pdf> <outdir> 1 1 2.0
+```
+
+**结论**（像素级墨水 bbox 统计 + PDF 文本层比对）：
+
+- ✅ 工具可用：原文/译文第 1 页均渲染成功，`page_1.bmp` 8,015,894 B（1190×1684、32bpp BGRA、自下而上行序翻转正确，与页尺寸精确一致）。
+- ✅ 文本位置：两页墨水 bbox 左缘均为 x=145px（=72pt，与 PDF 文本层 span 左缘一致），纵向同一条带（y 相差 ≤2px，对应译文 +1pt 基线差异）；译文因 `[TR] ` 前缀横向更宽（302→354px）。无重叠、无错位，页面几何保持一致。
+- ➖ 图片保留：本样例无图片，此项 N/A（工具以 `FPDF_ANNOT` 渲染，图片/注释路径未覆盖）。
+- ⚠️ **发现 Task 28 E2E 产物内容缺陷**：`out.pdf` 三页全部为 `[TR] page 2 content`（每页段落均写入了最后一页段落的译文；三次独立运行全部复现）。渲染链路本身正常（位置/几何正确），缺陷位于流水线段落→译文映射或重建匹配；`tests/e2e/e2e.test.ts` 仅断言 `toContain('[TR] page')`，未能捕获逐页内容错误。建议跟进修复（超出 Task 29 范围，未改动流水线代码）。
+
