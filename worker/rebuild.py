@@ -31,7 +31,15 @@ def _hex_to_rgb(color: str) -> tuple[float, float, float]:
     return tuple(int(value[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
 
 
-def _cover_and_write(page: fitz.Page, para: dict[str, Any], text: str, resolver: FontResolver) -> list[dict[str, Any]]:
+def _write_translation(page: fitz.Page, para: dict[str, Any], text: str, resolver: FontResolver) -> list[dict[str, Any]]:
+    """把译文写入段落锚点区域（不负责 redaction——由调用方两阶段批量处理）。
+
+    两阶段重建的原因（真实使用发现，见 test_rebuild_overlapping_paragraphs_keep_both_translations）：
+    书名页等版式里相邻段落的 bbox 纵向重叠（大字号作者行 + 紧贴其下的小字号单位行）。
+    旧实现逐段落「redact → 写」，后一段落的 redact 矩形会覆盖已写入的上一段译文，
+    apply_redactions 把相交字符删除（如 'Rafael C. ' 丢失、只剩 'onzalez'）。
+    正确顺序：先一次性删除本页全部原文，再统一写回全部译文。
+    """
     warnings: list[dict[str, Any]] = []
     rect = fitz.Rect(*para["bbox"])
     first_span = para["lines"][0]["spans"][0]
@@ -39,16 +47,6 @@ def _cover_and_write(page: fitz.Page, para: dict[str, Any], text: str, resolver:
     fontsize = float(first_span["size"])
     color = _hex_to_rgb(first_span["color"])
 
-    page.add_redact_annot(_redact_rect(para), fill=(1, 1, 1))
-    # 注：pymupdf 1.28.2 的 apply_redactions 签名是 (images, graphics, text)，
-    # 已无 annots 参数（旧版 PDF_REDACT_ANNOTS_* 常量随之移除）。此版本行为：
-    # 非链接注释保留；**与 redaction 区域相交的链接注释（URI link）会被删除**——
-    # Task 21 需做链接捕获-恢复，不能依赖默认保留。
-    page.apply_redactions(
-        images=fitz.PDF_REDACT_IMAGE_NONE,
-        graphics=fitz.PDF_REDACT_LINE_ART_NONE,
-        text=fitz.PDF_REDACT_TEXT_REMOVE,
-    )
     warnings.extend(
         _write_with_overflow_handling(page, para["id"], text, rect, anchor_y, fontsize, color, resolver, first_span["font"])
     )
@@ -153,6 +151,23 @@ def _restore_links(page: fitz.Page, links: list[dict[str, Any]]) -> None:
             page.insert_link(link)
 
 
+def _redact_page(page: fitz.Page, rects: list[fitz.Rect]) -> None:
+    """一次性删除本页所有待替换段落的原文（两阶段重建的第 ① 阶段）。
+
+    注：pymupdf 1.28.2 的 apply_redactions 签名是 (images, graphics, text)，
+    已无 annots 参数（旧版 PDF_REDACT_ANNOTS_* 常量随之移除）。此版本行为：
+    非链接注释保留；**与 redaction 区域相交的链接注释（URI link）会被删除**——
+    调用方必须先用 _capture_links 捕获、_restore_links 恢复。
+    """
+    for rect in rects:
+        page.add_redact_annot(rect, fill=(1, 1, 1))
+    page.apply_redactions(
+        images=fitz.PDF_REDACT_IMAGE_NONE,
+        graphics=fitz.PDF_REDACT_LINE_ART_NONE,
+        text=fitz.PDF_REDACT_TEXT_REMOVE,
+    )
+
+
 def rebuild_document(payload: dict[str, Any]) -> dict[str, Any]:
     input_path = payload["inputPath"]
     output_path = payload["outputPath"]
@@ -167,25 +182,28 @@ def rebuild_document(payload: dict[str, Any]) -> dict[str, Any]:
             geometry = _geometry_map(_extract_geometry(doc, index))
             # Task 21：pymupdf 1.28.2 的 redaction 会删除与区域相交的链接注释，
             # 先捕获本页将被 redact 的段落矩形相交的链接，写完后恢复。
-            # 捕获矩形与 _cover_and_write 的覆盖矩形必须一致（_redact_rect），
+            # 捕获矩形与 _redact_rect 的覆盖矩形必须一致（_redact_rect 共享），
             # 否则 2pt 边带内的链接会被删除却未捕获。
             redact_rects: list[fitz.Rect] = []
+            write_items: list[tuple[dict[str, Any], str]] = []
             for item in page_payload.get("paragraphs", []):
                 para_id = int(item["id"])
                 para = geometry.get(para_id)
-                if para is not None and item.get("text", "").strip():
-                    redact_rects.append(_redact_rect(para))
-            captured_links = _capture_links(page, redact_rects)
-            for item in page_payload.get("paragraphs", []):
-                para_id = int(item["id"])
-                text = item["text"]
-                para = geometry.get(para_id)
+                text = item.get("text", "")
                 if para is None:
                     warnings.append({"page": index, "paraId": para_id, "kind": "empty", "detail": "geometry not found"})
                     continue
                 if not text.strip():
-                    continue
-                warnings.extend(_cover_and_write(page, para, text, resolver))
+                    continue  # 空译文段落保留原文（不 redact、不写）
+                redact_rects.append(_redact_rect(para))
+                write_items.append((para, text))
+            # 两阶段重建（2026-09-01 真实使用修复）：先删除本页全部原文，
+            # 再统一写入全部译文——逐段落「redact→写」会让后段 redaction 删掉
+            # 已写入的前段译文（段落 bbox 纵向重叠时，如书名页大字号行+小字号行）。
+            captured_links = _capture_links(page, redact_rects)
+            _redact_page(page, redact_rects)
+            for para, text in write_items:
+                warnings.extend(_write_translation(page, para, text, resolver))
             _restore_links(page, captured_links)
         doc.save(output_path, incremental=False, garbage=3, deflate=True)
         return {"warnings": warnings}

@@ -68,3 +68,31 @@ def test_rebuild_preserves_link_in_redact_padding_band(tmp_path):
     doc.close()
     assert len(links) == 1
     assert links[0]["uri"] == "https://band.example"
+
+
+def test_rebuild_overlapping_paragraphs_keep_both_translations(tmp_path):
+    # 回归（真实使用发现）：书名页大字号作者行 + 下方小字号单位行，段落 bbox 纵向重叠。
+    # 旧实现逐段落「redact → 写」：后一段落的 redact 矩形覆盖了先写入的译文，
+    # apply_redactions 会把上一段译文与矩形相交的字符删掉（如 'Rafael C. ' 丢失剩 'onzalez'）。
+    # 正确行为：先一次性删除所有原文，再统一写入全部译文。
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 275), "Rafael C. Gonzalez", fontsize=23.75)
+    page.insert_text((72, 287), "University of Tennessee", fontsize=7.15)
+    src = tmp_path / "overlap.pdf"
+    doc.save(src)
+    doc.close()
+
+    out = tmp_path / "overlap_out.pdf"
+    result = rebuild.rebuild_document(
+        {"inputPath": str(src), "outputPath": str(out),
+         "pages": [{"index": 0, "paragraphs": [
+             {"id": 0, "text": "作者译文全文"},
+             {"id": 1, "text": "单位译文"},
+         ]}]}
+    )
+    doc = fitz.open(out)
+    text = doc[0].get_text("text")
+    doc.close()
+    assert "作者译文全文" in text, f"第一段译文被后一段落的 redaction 截断；输出={text!r}"
+    assert "单位译文" in text
