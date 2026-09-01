@@ -24,8 +24,8 @@ DSH（DeepSeek Harness）插件：用用户自有的 DeepSeek（或任意 OpenAI
 | Python 重建 | Task 17-21（redaction 覆盖、几何按 id 匹配、字体回退、溢出三级链、链接捕获-恢复、代码直写） | ✅ 完成 |
 | 流水线/工具 | Task 22-23（worker 进程管理、流水线编排） | ✅ 完成 |
 | 工具/集成 | Task 24-26（translate_pdf 工具、apply 入口、设置卡片 + esbuild 构建） | ✅ 完成 |
-| 挂载/安装 | Task 27（挂载配置、install-worker.ps1、README 完善；桌面 profile 已 link 安装，激活行待 E2E 后应用） | ✅ 完成 |
-| E2E/QA | Task 28-29（mock DeepSeek 全流程、PDFium 渲染对比） | ⏸ 待实现 |
+| 挂载/安装 | Task 27（挂载配置、install-worker.ps1、README 完善；桌面 profile 已 link 安装，激活行待确认后应用） | ✅ 完成 |
+| E2E/QA | Task 28-29（mock DeepSeek E2E 全流程、PDFium 渲染对比 QA 工具；QA 发现并修复段落 id 跨页碰撞缺陷） | ✅ 完成 |
 
 实施计划见 `docs/superpowers/plans/2026-08-30-dsh-pdf-translate.md`；设计规格见 `docs/superpowers/specs/2026-08-30-dsh-pdf-translate-design.md`；继续开发的交接说明见 `docs/HANDOFF.md`。
 
@@ -199,5 +199,5 @@ tools/pdf-render/build/Release/pdf_render.exe <input.pdf> <outdir> 1 1 2.0
 - ✅ 工具可用：原文/译文第 1 页均渲染成功，`page_1.bmp` 8,015,894 B（1190×1684、32bpp BGRA、自下而上行序翻转正确，与页尺寸精确一致）。
 - ✅ 文本位置：两页墨水 bbox 左缘均为 x=145px（=72pt，与 PDF 文本层 span 左缘一致），纵向同一条带（y 相差 ≤2px，对应译文 +1pt 基线差异）；译文因 `[TR] ` 前缀横向更宽（302→354px）。无重叠、无错位，页面几何保持一致。
 - ➖ 图片保留：本样例无图片，此项 N/A（工具以 `FPDF_ANNOT` 渲染，图片/注释路径未覆盖）。
-- ⚠️ **发现 Task 28 E2E 产物内容缺陷**：`out.pdf` 三页全部为 `[TR] page 2 content`（每页段落均写入了最后一页段落的译文；三次独立运行全部复现）。渲染链路本身正常（位置/几何正确），缺陷位于流水线段落→译文映射或重建匹配；`tests/e2e/e2e.test.ts` 仅断言 `toContain('[TR] page')`，未能捕获逐页内容错误。建议跟进修复（超出 Task 29 范围，未改动流水线代码）。
+- ⚠️ **发现并已修复 Task 28 E2E 产物内容缺陷**：`out.pdf` 三页曾全部为 `[TR] page 2 content`（每页段落均写入最后一页段落的译文）。**根因**：段落 id 按页局部编号（每页从 0 开始），TS 流水线 `translations` 映射按裸 id 键控 → 跨页碰撞。**修复**：`worker/extract.py` 的 `_paragraphs_of_page` 给 id 加 `page_index * 1_000_000` 偏移（extract 与 rebuild 共用此函数，两侧一致）；`tests/e2e/e2e.test.ts` 强化为逐页断言 `[TR] page N content`（旧代码下必失败）。修复后 3 页译文归属正确，E2E 与全量测试（40 Python + 64 TS）全绿。
 

@@ -62,7 +62,11 @@ doc.save(sys.argv[1])
       const check = exec('python', ['-c',
         `import pymupdf as fitz,sys; d=fitz.open(sys.argv[1]); t="".join(p.get_text("text") for p in d); print(t)`,
         join(dir, 'out.pdf')]).toString()
-      expect(check).toContain('[TR] page')
+      // 逐页断言译文归属（Task 29 QA 发现的回归：段落 id 曾按页局部编号、
+      // translations 映射跨页碰撞，导致每页都写入最后一页的译文）
+      for (let i = 0; i < 3; i += 1) {
+        expect(check).toContain(`[TR] page ${i} content`)
+      }
     } finally {
       await worker.dispose()
     }

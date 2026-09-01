@@ -26,6 +26,9 @@ def text_layer_info(payload: dict[str, Any]) -> dict[str, Any]:
         doc.close()
 
 
+_ID_BASE = 1_000_000  # 段落 id 全局化：page_index * _ID_BASE + 页内序
+
+
 def _paragraphs_of_page(doc: fitz.Document, page_index: int, body_size: float | None) -> list[Paragraph]:
     lines = _extract_lines_from_pdf(doc, page_index)
     if not lines:
@@ -36,6 +39,11 @@ def _paragraphs_of_page(doc: fitz.Document, page_index: int, body_size: float | 
         classify_paragraph(p, body_size)
     if page_confidence(paras) < 0.6:
         paras = apply_fallback(paras)
+    # Task 29 QA 发现的缺陷修复：cluster_paragraphs 的 id 是每页从 0 开始的局部编号，
+    # TS 流水线的 translations 映射按裸 id 键控 → 跨页碰撞（多页文档每页都写入最后一页
+    # 的译文）。extract 与 rebuild 的 _extract_geometry 同用本函数，全局化后两侧一致。
+    for p in paras:
+        p.id += page_index * _ID_BASE
     return paras
 
 
