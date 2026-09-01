@@ -41,7 +41,7 @@ DSH（DeepSeek Harness）插件：用用户自有的 DeepSeek（或任意 OpenAI
 
 ```bash
 # 1. 安装 Python worker 依赖（pymupdf + pytest）
-python -m pip install -r worker/requirements.txt
+powershell -File scripts/install-worker.ps1
 
 # 2. 安装 TS 依赖并构建
 pnpm install
