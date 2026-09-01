@@ -20,7 +20,6 @@ export interface PdfTranslateDict {
   save: string
   reset: string
   secretNote: string
-  apiKeyConfigured: string
 }
 
 export const zhDict: PdfTranslateDict = {
@@ -41,7 +40,6 @@ export const zhDict: PdfTranslateDict = {
   save: '保存',
   reset: '重置',
   secretNote: 'API Key 仅保存在本地配置，不会写入会话日志。',
-  apiKeyConfigured: '已配置（不回显）',
 }
 
 export const enDict: PdfTranslateDict = {
@@ -62,5 +60,4 @@ export const enDict: PdfTranslateDict = {
   save: 'Save',
   reset: 'Reset',
   secretNote: 'The API key is stored locally only and never written to session logs.',
-  apiKeyConfigured: 'Configured (not echoed)',
 }

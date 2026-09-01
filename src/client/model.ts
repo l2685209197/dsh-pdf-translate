@@ -51,12 +51,3 @@ export function stageDiff(
     }),
   )
 }
-
-/**
- * Whether a secret field has a configured value in the snapshot.
- * Secret values are redacted from `value`; presence is expressed by
- * `secrets` entries whose path names the field and whose `set` is true.
- */
-export function secretConfigured(snapshot: SettingsSnapshot, field: string): boolean {
-  return (snapshot.secrets ?? []).some(s => s.path.length === 1 && s.path[0] === field && s.set)
-}

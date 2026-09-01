@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { resetSettings, saveSettings } from '../src/client/index.js'
 import { enDict, zhDict } from '../src/client/locales.js'
-import { secretConfigured, settingsValue, stageDiff, stagedFromScope } from '../src/client/model.js'
+import { settingsValue, stageDiff, stagedFromScope } from '../src/client/model.js'
 
 describe('client settings model', () => {
   it('stages string and numeric scope values as text', () => {
@@ -39,22 +39,6 @@ describe('client settings model', () => {
     expect(settingsValue('concurrency', '')).toBeUndefined()
     expect(settingsValue('maxRetries', 'Infinity')).toBeUndefined()
     expect(settingsValue('timeoutMs', 'not-a-number')).toBeUndefined()
-  })
-
-  it('reports whether a secret field is configured', () => {
-    const snapshot = {
-      value: {},
-      base: {},
-      user: {},
-      secrets: [
-        { path: ['apiKey'], set: true },
-        { path: ['other'], set: false },
-      ],
-    }
-    expect(secretConfigured(snapshot, 'apiKey')).toBe(true)
-    expect(secretConfigured(snapshot, 'other')).toBe(false)
-    expect(secretConfigured(snapshot, 'missing')).toBe(false)
-    expect(secretConfigured({}, 'apiKey')).toBe(false)
   })
 })
 

@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { ChangeEvent, ReactNode } from 'react'
-import { secretConfigured, settingsValue, stageDiff, stagedFromScope } from './model.js'
+import { settingsValue, stageDiff, stagedFromScope } from './model.js'
 import type { SettingsSnapshot } from './model.js'
 import { enDict, zhDict, type PdfTranslateDict } from './locales.js'
 
@@ -145,7 +145,6 @@ function SettingField({
   type,
   label,
   value,
-  placeholder,
   focused,
   onChange,
   onFocusChange,
@@ -154,7 +153,6 @@ function SettingField({
   type: string
   label: string
   value: string
-  placeholder?: string
   focused: boolean
   onChange(value: string): void
   onFocusChange(focused: boolean): void
@@ -165,7 +163,6 @@ function SettingField({
       <input
         type={type}
         value={value}
-        placeholder={placeholder}
         style={{
           ...styles.input,
           borderColor: focused
@@ -228,9 +225,6 @@ export function PdfTranslateCard({ scope, t, getLocale, subscribeLocale }: PdfTr
       type={field.type}
       label={t(`field.${field.name}` as keyof PdfTranslateDict)}
       value={staged[field.name] ?? ''}
-      placeholder={field.name === 'apiKey' && secretConfigured(snapshot, 'apiKey') && !staged.apiKey
-        ? t('apiKeyConfigured')
-        : undefined}
       focused={focusedField === field.name}
       onFocusChange={(focused) => setFocusedField(focused ? field.name : null)}
       onChange={(value) => update(field.name, value)}
@@ -278,7 +272,9 @@ export function apply(ctx: ClientContext): void {
       scope,
       t,
       getLocale: () => ctx.locale.getSnapshot(),
-      subscribeLocale: ctx.locale.subscribe,
+      // 箭头包装保持 this：useSyncExternalStore 以普通调用执行 subscribe，
+      // 裸传 ctx.locale.subscribe 会因 this 丢失而崩溃（LocaleRuntime 用 this.listeners）
+      subscribeLocale: (fn) => ctx.locale.subscribe(fn),
     }),
   }, PdfTranslateCard))
 }
