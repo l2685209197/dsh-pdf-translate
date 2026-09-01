@@ -37,15 +37,13 @@ export const Config = Object.defineProperty(configSchema, 'schema', {
 }) as z<Config> & { readonly schema: z<Config> }
 
 export function apply(ctx: Context, config: Config): void {
-  try {
-    installSettingsSection(ctx, NS, Config, config, {
-      setSource: (current) => { config = current() },
-      // rc.2：SettingsSectionHooks 的 onChange 为必填（仅 validate 可选）；本插件
-      // 的配置经 setSource 后由 () => config 读取，无需额外派生，故为空实现。
-      onChange: () => {},
-    })
-  } catch {
-    // 无 settings provider 的宿主（如 headless）不提供设置段，工具仍可用
-  }
-  ctx.tools.register(defineTranslateTool({ ctx, config: () => config }))
+  // settings 未激活时保持入口配置；激活后 installSettingsSection 提供实时解析来源。
+  let source = () => config
+  installSettingsSection(ctx, NS, Config, config, {
+    setSource: (current) => { source = current },
+    // rc.2：SettingsSectionHooks 的 onChange 为必填（仅 validate 可选）；工具在每次
+    // 执行时通过 source() 读取配置，因此无需额外派生状态。
+    onChange: () => {},
+  })
+  ctx.tools.register(defineTranslateTool({ ctx, config: () => source() }))
 }
