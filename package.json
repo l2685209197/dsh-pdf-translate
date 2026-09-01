@@ -26,14 +26,20 @@
   },
   "files": [
     "lib",
-    "worker",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "worker/__init__.py",
+    "worker/main.py",
+    "worker/model.py",
+    "worker/extract.py",
+    "worker/rebuild.py",
+    "worker/requirements.txt"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/build-host.mjs && node scripts/build-client.mjs",
     "build:host": "tsc -p tsconfig.json",
     "build:client": "node scripts/build-client.mjs",
+    "prepublishOnly": "pnpm run build",
     "test": "vitest run",
     "test:python": "python -m pytest worker/tests -q"
   },
