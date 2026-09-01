@@ -1,8 +1,7 @@
 # dsh-pdf-translate
 
 [![npm version](https://img.shields.io/npm/v/dsh-pdf-translate)](https://www.npmjs.com/package/dsh-pdf-translate)
-[![license](https://img.shields.io/npm/l/dsh-pdf-translate)](LICENSE)
-[![npm downloads](https://img.shields.io/npm/dm/dsh-pdf-translate)](https://www.npmjs.com/package/dsh-pdf-translate)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 DSH（DeepSeek Harness）插件：用用户自有的 DeepSeek（或任意 OpenAI 兼容 API）对**文本型 PDF** 进行全文翻译，输出保留版式、字体样式、图片与链接的**可编辑 PDF**（文本可选中、可复制）。
 
