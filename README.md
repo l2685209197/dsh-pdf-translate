@@ -141,7 +141,7 @@ worker/                 Python worker
   extract.py            文本提取 + 段落识别
   rebuild.py            redaction + 写入
   tests/                pytest（40 个用例）
-tools/pdf-render/       PDFium 渲染 QA 工具（待 Task 29）
+tools/pdf-render/       PDFium 渲染对比 QA 工具（C++，链接现有 pdfium.lib）
 docs/superpowers/       规格 + 实施计划
 ```
 
@@ -151,7 +151,7 @@ docs/superpowers/       规格 + 实施计划
 # Python worker（40 个用例：协议/提取/聚类/分类/置信度/黄金版式/重建）
 python -m pytest worker/tests -q
 
-# TS 模块（63 个用例：分块/提示词/客户端/并发池/缓存/流水线/工具/入口/设置卡片）
+# TS 模块（64 个用例：分块/提示词/客户端/并发池/缓存/流水线/工具/入口/设置卡片/E2E）
 pnpm exec vitest run
 
 # 类型检查
