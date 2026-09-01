@@ -18,5 +18,7 @@ build/
 *.tgz
 .DS_Store
 Thumbs.db
+# 本地 npm 发布令牌（敏感，勿提交）
+.npmrc
 # 内部开发文档（实施计划/设计规格/交接说明）：仅本地保留，不进入公共仓库
 docs/
