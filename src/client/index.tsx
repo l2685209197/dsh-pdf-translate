@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { ChangeEvent, ReactNode } from 'react'
-import { stageDiff, stagedFromScope } from './model.js'
+import { settingsValue, stageDiff, stagedFromScope } from './model.js'
 import type { SettingsSnapshot } from './model.js'
 
 export interface Scope {
-  value?: Record<string, unknown>
-  base?: Record<string, unknown>
-  user?: Record<string, unknown>
-  getSnapshot(): Scope
+  getSnapshot(): SettingsSnapshot
   subscribe(listener: () => void): () => void
-  set(field: string, value: string): Promise<void>
-  unset(field: string): Promise<void>
+  set(field: string, value: string | number): void | Promise<void>
+  unset(field: string): void | Promise<void>
 }
 
 export interface ClientContext {
@@ -54,13 +51,10 @@ const executionFields = [
   { name: 'pythonBin', label: 'Python executable', type: 'text' },
 ] as const
 
+const fields = [...connectionFields, ...executionFields]
+
 function settingsSnapshot(scope: Scope): SettingsSnapshot {
-  const snapshot = scope.getSnapshot()
-  return {
-    value: snapshot.value ?? {},
-    base: snapshot.base ?? {},
-    user: snapshot.user ?? {},
-  }
+  return scope.getSnapshot()
 }
 
 function useSettings(scope: Scope): SettingsSnapshot {
@@ -94,6 +88,22 @@ function SettingField({
   )
 }
 
+export async function saveSettings(
+  scope: Pick<Scope, 'set'>,
+  staged: Record<string, string>,
+  base: Record<string, unknown>,
+): Promise<void> {
+  const diff = stageDiff(staged, base)
+  await Promise.all(Object.entries(diff).flatMap(([field, value]) => {
+    const typedValue = settingsValue(field, value)
+    return typedValue === undefined ? [] : [scope.set(field, typedValue)]
+  }))
+}
+
+export async function resetSettings(scope: Pick<Scope, 'unset'>): Promise<void> {
+  await Promise.all(fields.map(({ name }) => scope.unset(name)))
+}
+
 export function PdfTranslateCard({ scope }: PdfTranslateCardProps) {
   const snapshot = useSettings(scope)
   const [staged, setStaged] = useState(() => stagedFromScope(snapshot))
@@ -107,12 +117,11 @@ export function PdfTranslateCard({ scope }: PdfTranslateCardProps) {
   }
 
   const save = async () => {
-    const diff = stageDiff(staged, snapshot.base)
-    await Promise.all(Object.entries(diff).map(([field, value]) => scope.set(field, value)))
+    await saveSettings(scope, staged, snapshot.base ?? {})
   }
 
   const reset = async () => {
-    await Promise.all(Object.keys(staged).map((field) => scope.unset(field)))
+    await resetSettings(scope)
     setStaged(stagedFromScope(settingsSnapshot(scope)))
   }
 

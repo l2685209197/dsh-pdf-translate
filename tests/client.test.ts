@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { stageDiff, stagedFromScope } from '../src/client/model.js'
+import { describe, expect, it, vi } from 'vitest'
+import { resetSettings, saveSettings } from '../src/client/index.js'
+import { settingsValue, stageDiff, stagedFromScope } from '../src/client/model.js'
 
 describe('client settings model', () => {
   it('stages string and numeric scope values as text', () => {
@@ -24,5 +25,55 @@ describe('client settings model', () => {
       { apiKey: 'k', concurrency: 4, enabled: true, nested: {} },
       { apiKey: 'k', concurrency: '4' },
     )).toEqual({})
+  })
+
+  it('converts configured numeric fields to finite numbers while retaining text values', () => {
+    expect(settingsValue('concurrency', '4')).toBe(4)
+    expect(settingsValue('maxRetries', '2.5')).toBe(2.5)
+    expect(settingsValue('timeoutMs', '1000')).toBe(1000)
+    expect(settingsValue('baseUrl', 'https://api.example.test')).toBe('https://api.example.test')
+  })
+
+  it('refuses empty and non-finite numeric drafts', () => {
+    expect(settingsValue('concurrency', '')).toBeUndefined()
+    expect(settingsValue('maxRetries', 'Infinity')).toBeUndefined()
+    expect(settingsValue('timeoutMs', 'not-a-number')).toBeUndefined()
+  })
+})
+
+describe('PDF Translate settings card actions', () => {
+  it('saves numeric draft fields as numbers through the scope', async () => {
+    const set = vi.fn<(...args: [string, string | number]) => Promise<void>>().mockResolvedValue(undefined)
+
+    await saveSettings({ set }, { concurrency: '4', baseUrl: 'https://api.example.test' }, {})
+
+    expect(set).toHaveBeenCalledWith('concurrency', 4)
+    expect(set).toHaveBeenCalledWith('baseUrl', 'https://api.example.test')
+  })
+
+  it('does not write invalid numeric drafts', async () => {
+    const set = vi.fn<(...args: [string, string | number]) => Promise<void>>().mockResolvedValue(undefined)
+
+    await saveSettings({ set }, { concurrency: '', maxRetries: 'Infinity', timeoutMs: 'bad' }, {})
+
+    expect(set).not.toHaveBeenCalled()
+  })
+
+  it('resets every configurable field, including a redacted apiKey', async () => {
+    const unset = vi.fn<(...args: [string]) => Promise<void>>().mockResolvedValue(undefined)
+
+    await resetSettings({ unset })
+
+    expect(unset.mock.calls.map(([field]) => field)).toEqual([
+      'apiKey',
+      'baseUrl',
+      'model',
+      'langPair',
+      'termbasePath',
+      'concurrency',
+      'maxRetries',
+      'timeoutMs',
+      'pythonBin',
+    ])
   })
 })
