@@ -151,7 +151,6 @@ worker/                 Python worker
   rebuild.py            redaction + 写入
   tests/                pytest（41 个用例）
 tools/pdf-render/       PDFium 渲染对比 QA 工具（C++，链接现有 pdfium.lib）
-docs/superpowers/       规格 + 实施计划（内部开发文档）
 ```
 
 ## 测试
@@ -203,4 +202,3 @@ DSH Desktop 内置社区市场（目录源：DSH 1024Store / DSH Marketplace(qil
   - **重叠段落译文被截断**：重建改为两阶段（先删全部原文、再统一写译文）。
   - **页数上限误伤大书**：`maxPages` 作用于翻译范围长度而非全书页数。
 
-内部开发文档：`docs/superpowers/plans/2026-08-30-dsh-pdf-translate.md`（实施计划）、`docs/superpowers/specs/2026-08-30-dsh-pdf-translate-design.md`（设计规格）、`docs/HANDOFF.md`（交接说明）。
