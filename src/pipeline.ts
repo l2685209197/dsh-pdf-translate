@@ -47,12 +47,14 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineReport
   if (!textInfo.hasTextLayer) {
     throw new Error('no text layer: 该 PDF 无文本层（扫描版不在支持范围）')
   }
-  if (textInfo.pageCount > config.maxPages) {
-    throw new Error(`page count ${textInfo.pageCount} exceeds limit ${config.maxPages}`)
-  }
   const start = opts.pageStart ?? 0
   const end = Math.min(opts.pageEnd ?? textInfo.pageCount - 1, textInfo.pageCount - 1)
   if (start > end) throw new Error(`invalid page range: ${start}..${end}`)
+  // 页数上限作用于本次实际翻译的范围长度（而非全书页数）：
+  // 大书（如 845 页教材）只译其中 1-20 页是合法任务。
+  if (end - start + 1 > config.maxPages) {
+    throw new Error(`page range ${start + 1}..${end + 1} exceeds limit ${config.maxPages} pages`)
+  }
 
   opts.onProgress?.({ stage: 'extract', detail: `${start}..${end}` })
   const extracted = await worker.command<{ pages: { index: number; paragraphs: Paragraph[] }[] }>(

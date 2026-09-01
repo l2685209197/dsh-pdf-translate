@@ -60,6 +60,34 @@ describe('runPipeline', () => {
     await expect(runPipeline({ ...baseOpts, worker, client: fakeClient('x') })).rejects.toThrow(/50/i)
   })
 
+  it('全书页数超限但指定范围未超限时正常翻译（回归：限制作用于范围而非全书）', async () => {
+    const worker = fakeWorker()
+    ;(worker.command as ReturnType<typeof vi.fn>).mockImplementation(async (cmd: string) => {
+      if (cmd === 'textlayer') return { pageCount: 845, hasTextLayer: true, pages: [] }
+      if (cmd === 'extract') {
+        return {
+          pages: [
+            { index: 0, paragraphs: [{ id: 0, bbox: [0, 0, 10, 10], firstLineAnchor: [0, 5], lines: [{ text: 'hello', bbox: [0, 0, 10, 10], origin: [0, 5], spans: [] }], type: 'body', readingOrder: 0, confidence: 1, table: null }] },
+          ],
+        }
+      }
+      if (cmd === 'rebuild') return { warnings: [] }
+      throw new Error('unexpected')
+    })
+    const report = await runPipeline({ ...baseOpts, worker, client: fakeClient('你好'), pageStart: 0, pageEnd: 19 })
+    expect(report.pagesTranslated).toBe(1)
+    expect(worker.command).toHaveBeenCalledWith('extract', expect.objectContaining({ start: 0, end: 19 }))
+  })
+
+  it('未指定范围时全书页数超限仍报错', async () => {
+    const worker = fakeWorker()
+    ;(worker.command as ReturnType<typeof vi.fn>).mockImplementation(async (cmd: string) => {
+      if (cmd === 'textlayer') return { pageCount: 845, hasTextLayer: true, pages: [] }
+      throw new Error('unexpected')
+    })
+    await expect(runPipeline({ ...baseOpts, worker, client: fakeClient('x') })).rejects.toThrow(/50/i)
+  })
+
   it('完整流程：提取→翻译→重建→报告', async () => {
     const worker = fakeWorker()
     const client = fakeClient('你好')

@@ -64,7 +64,7 @@ dsh plugin --profile desktop add "E:\Code\dsh-pdf-translate"
 |---|---|---|
 | `input` | ✅ | 输入 PDF 绝对路径 |
 | `outputDir` | ✅ | 输出目录 |
-| `pageStart` / `pageEnd` | 可选 | 页面范围（1-based），默认全文；校验 ≤ 50 页 |
+| `pageStart` / `pageEnd` | 可选 | 页面范围（1-based），默认全文；**单次任务范围 ≤ 50 页**（大书可分页段多次翻译） |
 | `langPair` | 可选 | 语言对，如 `en→zh`；默认取配置 |
 | `termbase` | 可选 | 术语表文件路径（JSON/TXT） |
 
@@ -171,6 +171,20 @@ pnpm exec tsc -p tsconfig.json --noEmit
 - **批内请求合并**：当前每段落一次 API 调用（并发已达标）；批次合并为后续优化。
 - **公式 LaTeX / 脚注对应**：v2。
 - **复杂版式**（文本框重叠/旋转文字）：置信度降级为逐行翻译并标注；QA 阶段评估 ML 布局模型。
+
+## 直连 CLI（不经 DSH 应用）
+
+设置卡片/工具之外，仓库内置两个脚本直接复用生产流水线（与 `translate_pdf` 工具完全同路径）：
+
+```bash
+# 干跑：只提取段落统计，不调用 API（预估段数/成本）
+node scripts/extract-dryrun.mjs <input.pdf> [start0Based] [end0Based]
+
+# 真实翻译（需要 DEEPSEEK_API_KEY 环境变量；与设置卡片同一字段）
+node scripts/translate-cli.mjs <input.pdf> <outputDir> [pageStart1Based] [pageEnd1Based] [langPair]
+```
+
+产物：`<outputDir>/<书名>.<langPair>.pdf` + `<outputDir>/.translate-cache.json`（断点续传缓存，重跑同段落直接命中）。
 
 ## 开发说明
 
