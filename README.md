@@ -82,7 +82,15 @@ dsh plugin --profile desktop add "E:\Code\dsh-pdf-translate"
 | `termbasePath` | 空 | 默认术语表路径 |
 | `pythonBin` | `python` | Python 解释器 |
 
-设置卡片（DSH 桌面设置页 → 插件区）以 zh/en 双语渲染：文案经 `ctx.locale` 注册 `settings.pdfTranslate` 命名空间词典，跟随应用全局 Language 切换即时中英互换；视觉使用 `--dsw-*` 主题 token（明暗自动适配）。API Key 为 secret 角色：保存后不再回显值，显示为「已配置」（连接配置分组内）。
+设置卡片（DSH 桌面设置页 → 插件区）以 zh/en 双语渲染：文案经 `ctx.locale` 注册 `settings.pdfTranslate` 命名空间词典，跟随应用全局 Language 切换即时中英互换；视觉使用 `--dsw-*` 主题 token（明暗自动适配）。API Key 为 secret 角色：保存后不再回显值，显示为「已配置」（连接配置分组内）。输入框带可编辑视觉标识（浅灰底色 + 可见边框 + 聚焦蓝环 + 每字段示例占位符），避免"全白看不出能输入"。
+
+## 发布到 DSH 插件市场
+
+DSH Desktop 内置社区市场（目录源：DSH 1024Store / DSH Marketplace(qilewl.net) / dshfind）。目录条目 = GitHub 仓库元数据 + `dsh plugin --profile <name> add <npm包>` 部署命令；**可安装前提**：npm 官方 latest 稳定版本 + 有效的 `dsh.bundle.patch`。本仓库已做好发布前置：
+
+- `package.json`：已声明 `dsh.bundle.patch: "cordis.patch.yml"`（插件进入 profile bundle 层）、`license: MIT`、`description`/`keywords`，无 `private`。
+- 发布流程：`npm login` → `pnpm publish --access public`；随后把仓库推送到 GitHub（公开，补 topics 分类），再到市场站点（qilewl.net 等）按其收录流程提交。
+- **重复条目注意**：走市场/bundle 层安装后，不要再在 profile 补丁层保留同一条 `insert` 行（loader 树重复 id 会启动失败）。
 
 ## 术语表格式
 
@@ -153,7 +161,7 @@ docs/superpowers/       规格 + 实施计划
 # Python worker（41 个用例：协议/提取/聚类/分类/置信度/黄金版式/重建）
 python -m pytest worker/tests -q
 
-# TS 模块（72 个用例：分块/提示词/客户端/并发池/缓存/流水线/工具/入口/设置卡片/jsdom 渲染/E2E）
+# TS 模块（73 个用例：分块/提示词/客户端/并发池/缓存/流水线/工具/入口/设置卡片/jsdom 渲染/E2E）
 pnpm exec vitest run
 
 # 类型检查
@@ -215,5 +223,5 @@ tools/pdf-render/build/Release/pdf_render.exe <input.pdf> <outdir> 1 1 2.0
 - ✅ 工具可用：原文/译文第 1 页均渲染成功，`page_1.bmp` 8,015,894 B（1190×1684、32bpp BGRA、自下而上行序翻转正确，与页尺寸精确一致）。
 - ✅ 文本位置：两页墨水 bbox 左缘均为 x=145px（=72pt，与 PDF 文本层 span 左缘一致），纵向同一条带（y 相差 ≤2px，对应译文 +1pt 基线差异）；译文因 `[TR] ` 前缀横向更宽（302→354px）。无重叠、无错位，页面几何保持一致。
 - ➖ 图片保留：本样例无图片，此项 N/A（工具以 `FPDF_ANNOT` 渲染，图片/注释路径未覆盖）。
-- ⚠️ **发现并已修复 Task 28 E2E 产物内容缺陷**：`out.pdf` 三页曾全部为 `[TR] page 2 content`（每页段落均写入最后一页段落的译文）。**根因**：段落 id 按页局部编号（每页从 0 开始），TS 流水线 `translations` 映射按裸 id 键控 → 跨页碰撞。**修复**：`worker/extract.py` 的 `_paragraphs_of_page` 给 id 加 `page_index * 1_000_000` 偏移（extract 与 rebuild 共用此函数，两侧一致）；`tests/e2e/e2e.test.ts` 强化为逐页断言 `[TR] page N content`（旧代码下必失败）。修复后 3 页译文归属正确，E2E 与全量测试（41 Python + 72 TS）全绿。
+- ⚠️ **发现并已修复 Task 28 E2E 产物内容缺陷**：`out.pdf` 三页曾全部为 `[TR] page 2 content`（每页段落均写入最后一页段落的译文）。**根因**：段落 id 按页局部编号（每页从 0 开始），TS 流水线 `translations` 映射按裸 id 键控 → 跨页碰撞。**修复**：`worker/extract.py` 的 `_paragraphs_of_page` 给 id 加 `page_index * 1_000_000` 偏移（extract 与 rebuild 共用此函数，两侧一致）；`tests/e2e/e2e.test.ts` 强化为逐页断言 `[TR] page N content`（旧代码下必失败）。修复后 3 页译文归属正确，E2E 与全量测试（41 Python + 73 TS）全绿。
 
