@@ -29,8 +29,9 @@ powershell -ExecutionPolicy Bypass -File scripts/install-worker.ps1
 pnpm install
 pnpm run build
 
-# 3. 挂载到 DSH 桌面 profile（发布前可指向本地目录）
-dsh plugin --profile desktop add "E:\Code\dsh-pdf-translate"
+# 3. 挂载到 DSH 桌面 profile
+#    发布后：dsh plugin --profile desktop add dsh-pdf-translate
+#    开发期：dsh plugin --profile desktop add <本地仓库路径>
 
 # 4. 重启 DSH Desktop → 设置 → 插件区 →「PDF 翻译」卡片填入 API Key → 保存
 
