@@ -129,17 +129,17 @@ API,应用程序接口
 src/                    TS 插件
   types.ts              协议类型（与 worker JSON 镜像）
   translate/            分块器/提示词/DeepSeek 客户端/并发池/缓存
-  worker.ts             Python worker 进程管理（待 Task 22）
-  pipeline.ts           流水线编排（待 Task 23）
-  tool.ts               translate_pdf 工具（待 Task 24）
-  index.ts              apply 入口（待 Task 25）
-  client/               设置卡片（待 Task 26）
+  worker.ts             Python worker 进程管理
+  pipeline.ts           流水线编排
+  tool.ts               translate_pdf 工具
+  index.ts              apply 入口
+  client/               设置卡片
 worker/                 Python worker
   main.py               stdio 协议分发
   model.py              数据模型（协议唯一来源）
   extract.py            文本提取 + 段落识别
   rebuild.py            redaction + 写入
-  tests/                pytest（31 个用例）
+  tests/                pytest（40 个用例）
 tools/pdf-render/       PDFium 渲染 QA 工具（待 Task 29）
 docs/superpowers/       规格 + 实施计划
 ```
@@ -147,10 +147,10 @@ docs/superpowers/       规格 + 实施计划
 ## 测试
 
 ```bash
-# Python worker（31 个用例：协议/提取/聚类/分类/置信度/黄金版式/重建）
+# Python worker（40 个用例：协议/提取/聚类/分类/置信度/黄金版式/重建）
 python -m pytest worker/tests -q
 
-# TS 模块（29 个用例：分块/提示词/客户端/并发池/缓存）
+# TS 模块（63 个用例：分块/提示词/客户端/并发池/缓存/流水线/工具/入口/设置卡片）
 pnpm exec vitest run
 
 # 类型检查
