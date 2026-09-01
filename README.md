@@ -41,8 +41,8 @@ DSH（DeepSeek Harness）插件：用用户自有的 DeepSeek（或任意 OpenAI
 ## 安装
 
 ```bash
-# 1. 安装 Python worker 依赖（pymupdf + pytest）
-powershell -File scripts/install-worker.ps1
+# 1. 安装 Python worker 依赖（pymupdf + pytest；-ExecutionPolicy Bypass 因 Windows PowerShell 5.1 默认拦截脚本）
+powershell -ExecutionPolicy Bypass -File scripts/install-worker.ps1
 
 # 2. 安装 TS 依赖并构建
 pnpm install
