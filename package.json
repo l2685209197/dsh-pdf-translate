@@ -1,7 +1,16 @@
 {
   "name": "dsh-pdf-translate",
   "version": "0.1.0",
-  "private": true,
+  "description": "DSH plugin: translate text-based PDFs via DeepSeek or any OpenAI-compatible API, preserving layout, fonts, images and links (editable output PDF, ≤50 pages per task).",
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "pdf",
+    "translate",
+    "translation",
+    "deepseek",
+    "pymupdf"
+  ],
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -49,6 +58,9 @@
     "vitest": "^2.1.0"
   },
   "dsh": {
+    "bundle": {
+      "patch": "cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "inject": [

@@ -52,19 +52,20 @@ export const inject = ['slots', 'settingsScope', 'locale']
 const namespace = 'pdf-translate'
 const localeNamespace = 'settings.pdfTranslate'
 
+// 占位符给"不知道填什么"的用户示例值；非句子，故不随语言切换。
 const connectionFields = [
-  { name: 'apiKey', type: 'password' as const },
-  { name: 'baseUrl', type: 'text' as const },
-  { name: 'model', type: 'text' as const },
-  { name: 'langPair', type: 'text' as const },
-  { name: 'termbasePath', type: 'text' as const },
+  { name: 'apiKey', type: 'password' as const, placeholder: 'sk-…' },
+  { name: 'baseUrl', type: 'text' as const, placeholder: 'https://api.deepseek.com' },
+  { name: 'model', type: 'text' as const, placeholder: 'deepseek-chat' },
+  { name: 'langPair', type: 'text' as const, placeholder: 'en→zh' },
+  { name: 'termbasePath', type: 'text' as const, placeholder: 'C:\\path\\terms.json' },
 ]
 
 const executionFields = [
-  { name: 'concurrency', type: 'number' as const },
-  { name: 'maxRetries', type: 'number' as const },
-  { name: 'timeoutMs', type: 'number' as const },
-  { name: 'pythonBin', type: 'text' as const },
+  { name: 'concurrency', type: 'number' as const, placeholder: '6' },
+  { name: 'maxRetries', type: 'number' as const, placeholder: '3' },
+  { name: 'timeoutMs', type: 'number' as const, placeholder: '60000' },
+  { name: 'pythonBin', type: 'text' as const, placeholder: 'python' },
 ]
 
 const fields = [...connectionFields, ...executionFields]
@@ -108,13 +109,15 @@ const styles = {
   },
   field: { display: 'grid', gap: 4 },
   label: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' },
+  // 输入框视觉可编辑感（2026-09-01 用户反馈"全白看不出能输入"）：
+  // 底色用 --dsw-specific-login-input（亮色=浅灰，区别于白色卡片底色），
+  // 边框用 --dsw-alias-border-l2（两主题均可见，原 border-inverted 亮色=透明）；
+  // hover/聚焦/占位符由下方 inputCss 类处理（:focus 原生聚焦，含键盘聚焦）。
   input: {
-    padding: '6px 8px',
-    borderRadius: 6,
-    border: '1px solid var(--dsw-alias-border-inverted)',
-    background: 'var(--dsw-specific-input-major)',
-    color: 'var(--dsw-alias-label-primary)',
+    padding: '7px 10px',
+    borderRadius: 8,
     fontSize: 13,
+    color: 'var(--dsw-alias-label-primary)',
     outline: 'none',
   },
   footer: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
@@ -140,37 +143,47 @@ const styles = {
   note: { margin: 0, fontSize: 11, color: 'var(--dsw-alias-label-caption)' },
 } satisfies Record<string, React.CSSProperties>
 
+// 输入框的悬停/聚焦/占位符样式：内联样式无法表达伪类，注入一个按类名作用域的 <style>。
+// 聚焦环用 --dsw-alias-state-business-tertiary（亮色=浅蓝光晕），边框切 business-primary。
+const inputCss = `
+.dsh-pt-input {
+  border: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-specific-login-input);
+  transition: border-color .12s ease, background-color .12s ease, box-shadow .12s ease;
+}
+.dsh-pt-input:hover { border-color: var(--dsw-alias-border-l3); }
+.dsh-pt-input:focus {
+  border-color: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-specific-input-major);
+  box-shadow: 0 0 0 3px var(--dsw-alias-state-business-tertiary);
+}
+.dsh-pt-input::placeholder { color: var(--dsw-alias-label-dimmed); }
+`
+
 function SettingField({
   name,
   type,
   label,
+  placeholder,
   value,
-  focused,
   onChange,
-  onFocusChange,
 }: {
   name: string
   type: string
   label: string
+  placeholder?: string
   value: string
-  focused: boolean
   onChange(value: string): void
-  onFocusChange(focused: boolean): void
 }) {
   return (
     <label style={styles.field}>
       <span style={styles.label}>{label}</span>
       <input
+        className="dsh-pt-input"
         type={type}
         value={value}
-        style={{
-          ...styles.input,
-          borderColor: focused
-            ? 'var(--dsw-alias-state-business-primary)'
-            : 'var(--dsw-alias-border-inverted)',
-        }}
-        onFocus={() => onFocusChange(true)}
-        onBlur={() => onFocusChange(false)}
+        placeholder={placeholder}
+        style={styles.input}
         onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)}
       />
     </label>
@@ -199,7 +212,6 @@ export function PdfTranslateCard({ scope, t, getLocale, subscribeLocale }: PdfTr
 
   const snapshot = useSettings(scope)
   const [staged, setStaged] = useState(() => stagedFromScope(snapshot))
-  const [focusedField, setFocusedField] = useState<string | null>(null)
 
   useEffect(() => {
     setStaged(stagedFromScope(snapshot))
@@ -218,21 +230,21 @@ export function PdfTranslateCard({ scope, t, getLocale, subscribeLocale }: PdfTr
     setStaged(stagedFromScope(settingsSnapshot(scope)))
   }
 
-  const renderField = (field: { name: string; type: string }) => (
+  const renderField = (field: { name: string; type: string; placeholder?: string }) => (
     <SettingField
       key={field.name}
       name={field.name}
       type={field.type}
       label={t(`field.${field.name}` as keyof PdfTranslateDict)}
+      placeholder={field.placeholder}
       value={staged[field.name] ?? ''}
-      focused={focusedField === field.name}
-      onFocusChange={(focused) => setFocusedField(focused ? field.name : null)}
       onChange={(value) => update(field.name, value)}
     />
   )
 
   return (
     <section aria-label={t('ariaLabel')} style={styles.section}>
+      <style>{inputCss}</style>
       <header style={styles.header}>
         <h2 style={styles.title}>{t('title')}</h2>
         <p style={styles.subtitle}>{t('subtitle')}</p>

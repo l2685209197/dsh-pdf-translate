@@ -5,6 +5,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { PdfTranslateCard, type PdfTranslateCardProps } from '../src/client/index.js'
 import { enDict, zhDict } from '../src/client/locales.js'
 
+// 与 src/client/index.tsx 的 connectionFields 数量保持一致（执行分组另有 4 个）
+const connectionFieldCount = 5
+
 function props(overrides: Partial<PdfTranslateCardProps> = {}): PdfTranslateCardProps {
   // uSES 契约：getSnapshot 必须返回稳定引用（LocaleRuntime 在变更间冻结快照）
   const localeSnapshot = { active: 'en' as const, revision: 0 }
@@ -84,6 +87,19 @@ describe('PdfTranslateCard 渲染（jsdom）', () => {
     // 触发一次快照变更回调（如同 locale 切换后的通知），组件应能重渲而不抛
     expect(() => act(() => { listenerRef?.() })).not.toThrow()
     expect(subscribed.length).toBe(1)
+    cleanup()
+  })
+
+  it('输入框带可编辑视觉标识（class + 占位符示例）', () => {
+    // 回归（用户反馈"输入框全白看不出能输入"）：input 必须挂 dsh-pt-input 类
+    // （样式层提供可见边框/底色/聚焦环），并提供占位符示例值。
+    const { container, cleanup } = renderCard(props())
+    const inputs = Array.from(container.querySelectorAll('input.dsh-pt-input'))
+    expect(inputs.length).toBeGreaterThanOrEqual(connectionFieldCount)
+    const placeholders = inputs.map(i => i.getAttribute('placeholder')).filter(Boolean)
+    expect(placeholders.length).toBeGreaterThanOrEqual(connectionFieldCount)
+    expect(placeholders).toContain('https://api.deepseek.com')
+    expect(placeholders).toContain('sk-…')
     cleanup()
   })
 })

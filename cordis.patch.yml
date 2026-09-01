@@ -1,7 +1,10 @@
-# dsh-pdf-translate 挂载示例
-# 复制本 insert 行到你的 profile 补丁层：
-#   %USERPROFILE%\.dsh\profiles\<profile>\cordis.patch.yml
-# 桌面实例 patchReload: live，改动即时生效。
+# dsh-pdf-translate 的 bundle patch（双重角色）：
+# 1. 声明式补丁：package.json 的 dsh.bundle.patch 指向本文件——插件进入 profile
+#    bundle 层后由 loader 自动应用（市场安装/`dsh plugin --profile X add` 的前提）。
+# 2. 手动挂载示例：把下面的 insert 行复制到 profile 补丁层
+#    （%USERPROFILE%\.dsh\profiles\<profile>\cordis.patch.yml，桌面实例 patchReload: live 即时生效）。
+# 注意：走市场/bundle 层安装时，不要再在 profile 补丁层保留同一条 insert 行，
+# 否则 loader 树出现重复 id（pdf-translate）导致启动失败（dsh 重复条目保护）。
 - insert:
     - id: pdf-translate
       name: dsh-pdf-translate
