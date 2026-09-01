@@ -23,8 +23,8 @@ DSH（DeepSeek Harness）插件：用用户自有的 DeepSeek（或任意 OpenAI
 | TS 翻译模块 | Task 12-16（协议类型、分块器、提示词/解析、DeepSeek 客户端、并发池、译文缓存） | ✅ 完成 |
 | Python 重建 | Task 17-21（redaction 覆盖、几何按 id 匹配、字体回退、溢出三级链、链接捕获-恢复、代码直写） | ✅ 完成 |
 | 流水线/工具 | Task 22-23（worker 进程管理、流水线编排） | ✅ 完成 |
-| 工具/集成 | Task 24-27（translate_pdf 工具、apply 入口、设置卡片、挂载/安装脚本） | ⏸ 待实现 |
-| E2E/QA | Task 28-29（mock DeepSeek 全流程、PDFium 渲染对比） | ⏸ 待实现 |
+| 工具/集成 | Task 24-26（translate_pdf 工具、apply 入口、设置卡片 + esbuild 构建） | ✅ 完成 |
+| 挂载/E2E/QA | Task 27-29（挂载/安装脚本、mock DeepSeek E2E、PDFium 渲染对比） | ⏸ 待实现 |
 
 实施计划见 `docs/superpowers/plans/2026-08-30-dsh-pdf-translate.md`；设计规格见 `docs/superpowers/specs/2026-08-30-dsh-pdf-translate-design.md`；继续开发的交接说明见 `docs/HANDOFF.md`。
 
